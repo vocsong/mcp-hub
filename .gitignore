@@ -8,3 +8,5 @@ dist/
 worker-configuration.d.ts
 demo/
 dist-preview/
+
+dist-auth/

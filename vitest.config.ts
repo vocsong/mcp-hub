@@ -5,6 +5,7 @@ export default defineConfig({
     cloudflareTest({
       wrangler: { configPath: "./wrangler.jsonc", environment: "local" },
       miniflare: {
+        d1Databases: ["AUTH_DB"],
         bindings: {
           KEY_ENCRYPTION_KEY: btoa("01234567890123456789012345678901"),
         },
