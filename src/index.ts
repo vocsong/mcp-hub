@@ -1,3 +1,4 @@
+import { handleLogin, cleanupLogin } from "./login/worker";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z, ZodError } from "zod";
@@ -36,6 +37,8 @@ const json = (data: unknown, status = 200) =>
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     try {
+      const login = await handleLogin(req, env);
+      if (login) return login;
       const who = await identity(req, env);
       const url = new URL(req.url);
       const path = url.pathname;
@@ -225,5 +228,8 @@ export default {
             : 500,
       );
     }
+  },
+  async scheduled(_event: ScheduledController, env: Env): Promise<void> {
+    await cleanupLogin(env);
   },
 } satisfies ExportedHandler<Env>;

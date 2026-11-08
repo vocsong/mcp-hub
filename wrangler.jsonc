@@ -8,6 +8,7 @@
   "preview_urls": false,
   "vars": {
     "APP_MODE": "disabled",
+    "PRODUCT_LOGIN_ENABLED": "false",
     "PUBLIC_ORIGIN": "https://mcp.vocs.io",
     "LIVE_PROVIDER": "disabled",
   },

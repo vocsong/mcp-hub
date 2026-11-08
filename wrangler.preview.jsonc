@@ -1,9 +1,13 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "vocs-mcp-preview",
-  "main": "src/preview.ts",
+  "main": "src/preview-login.ts",
   "compatibility_date": "2026-11-08",
   "workers_dev": false,
+  "vars": {
+    "PRODUCT_LOGIN_ENABLED": "false",
+    "PUBLIC_ORIGIN": "https://mcp.vocs.io",
+  },
   "preview_urls": false,
   "observability": { "enabled": false, "traces": { "enabled": false } },
   "routes": [{ "pattern": "mcp.vocs.io", "custom_domain": true }],

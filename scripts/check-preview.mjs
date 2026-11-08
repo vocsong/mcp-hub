@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 const mf = new Miniflare(
   convertV4MiniflareOptions({
-    scriptPath: "dist-preview/preview.js",
+    scriptPath: "dist-preview/preview-login.js",
     modules: true,
     compatibilityDate: "2026-11-08",
     host: "127.0.0.1",
