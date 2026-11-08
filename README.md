@@ -1,12 +1,16 @@
 # Vocs MCP Hub
 
-An invite-only, multi-tenant Cloudflare MCP hub. First capability: bounded OpenRouter speech generation at `/openrouter`. The intended home is `https://mcp.vocs.io`; nothing is deployed there by this repository.
+An invite-only, multi-tenant Cloudflare MCP hub. First capability: bounded OpenRouter speech generation at `/openrouter`. The public mock-only design preview is at `https://mcp.vocs.io`. The private backend and account login are not deployed.
 
 ## Honest MVP status
 
 **Runnable local preview, not a production service.** The local dashboard exercises real MCP SDK transport, SQLite Durable Objects, approval/budget controls and private R2 audio. Demo audio is a generated test tone, **not actual speech**. No paid requests were made. Production and live provider calls are disabled by default. The OpenRouter adapter is implemented and tested against mocked HTTP responses, not a live account.
 
 Google/GitHub sign-in, reusable Vocs accounts, OAuth authorization/discovery/PKCE, remote Dots/Vocs Code compatibility, client token issuance/revocation, production monitoring and account deletion/export are release gates, not completed features. This preview uses a local-only demo identity, and includes a vetted `jose` JWT verifier for a future trusted issuer. Do not advertise it as a completed OAuth MCP server.
+
+## Account-login development
+
+The `feat/secure-login-foundation` branch adds a separately gated Better Auth account service. This is browser-account authentication, not MCP OAuth authorization. It does not modify the live mock, VocsCode accounts or production credentials. See [the threat model and activation plan](docs/LOGIN-RELEASE-PLAN.md) for provider setup, staging tests and release gates.
 
 ## Run locally
 

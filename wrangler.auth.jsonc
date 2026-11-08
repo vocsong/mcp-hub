@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "vocs-auth-foundation",
+  "main": "src/auth/worker.ts",
+  "compatibility_date": "2026-11-08",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": { "AUTH_ENABLED": "false" },
+  // No routes, credentials, or provisioned database. Activation needs separate approval.
+  "observability": { "enabled": false, "traces": { "enabled": false } },
+}
