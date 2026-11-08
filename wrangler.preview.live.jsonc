@@ -1,0 +1,30 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "vocs-mcp-preview",
+  "main": "src/preview-login.ts",
+  "compatibility_date": "2026-11-08",
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": {
+    "PRODUCT_LOGIN_ENABLED": "true",
+    "PUBLIC_ORIGIN": "https://mcp.vocs.io",
+  },
+  "d1_databases": [
+    {
+      "binding": "LOGIN_DB",
+      "database_name": "vocs-mcp-login",
+      "database_id": "e83b678d-6ae6-48e3-9eb3-a2ff8aae4094",
+      "migrations_dir": "migrations/login",
+    },
+  ],
+  "triggers": { "crons": ["*/15 * * * *"] },
+  "observability": {
+    "enabled": false,
+    "redact_query_string": true,
+    "logs": { "enabled": false, "invocation_logs": false },
+    "traces": { "enabled": false },
+  },
+  "logpush": false,
+  "tail_consumers": [],
+  "routes": [{ "pattern": "mcp.vocs.io", "custom_domain": true }],
+}

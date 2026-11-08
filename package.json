@@ -19,7 +19,8 @@
     "build:preview": "wrangler deploy --dry-run --config wrangler.preview.jsonc --outdir dist-preview",
     "dev:preview": "npm run build:preview && node scripts/local-preview.mjs",
     "check:preview": "npm run build:preview && node scripts/check-preview.mjs",
-    "check:login-ui": "node scripts/check-login-ui.mjs"
+    "check:login-ui": "node scripts/check-login-ui.mjs",
+    "build:preview:live": "wrangler deploy --dry-run --config wrangler.preview.live.jsonc --outdir dist-preview"
   },
   "keywords": [],
   "author": "",

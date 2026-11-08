@@ -8,7 +8,8 @@ MCP Hub PR #1. That draft is not required or merged by this change.
 ## What is ready
 
 `/login` and `/account` are optional product-account pages, served by both the
-preview wrapper and private backend. They are disabled by default. The existing
+preview wrapper and private backend. The development target is disabled by default. A separately approved live-test
+configuration is recorded below. The existing
 public dashboard, its browser-only mock interactions, CSP, storage behavior and
 MCP refusal remain unchanged. There is no public link to login until activation
 is approved; the live-test entry point will be `https://mcp.vocs.io/login`.
@@ -64,10 +65,11 @@ not issue JWTs or MCP access/refresh tokens.
   removes expired flows and sessions. Principals persist until an approved data
   retention/erasure procedure addresses them. No permanent deletion UI is added.
 
-## Exact activation request (not executed)
+## Activation parameters
 
-The following require explicit action-time approval before enabling persistent
-access. No secret is required for this narrow PKCE client registration.
+These parameters were approved for the identity-only live test recorded below.
+Further access expansion still requires approval. No secret is required for this
+narrow PKCE client registration.
 
 - Identity service: `https://auth.vocs.io`.
 - Client ID: `mcp-hub`.
@@ -85,11 +87,12 @@ access. No secret is required for this narrow PKCE client registration.
   the Vocs Login database, the abandoned PR #1 database, or unrelated product data.
 - Product activation: retain `PUBLIC_ORIGIN=https://mcp.vocs.io`, set
   `PRODUCT_LOGIN_ENABLED=true` only after approval, and deploy the preview wrapper
-  in `wrangler.preview.jsonc`. `APP_MODE`/`LIVE_PROVIDER` remain disabled. No route
+  with the dedicated `wrangler.preview.live.jsonc`. `APP_MODE`/`LIVE_PROVIDER` remain disabled. No route
   or DNS change is required for the existing domain, but inspect live Worker
   bindings first. Do not deploy the private `wrangler.jsonc` over the public mock.
 - Set a cleanup cron, verify safe operational monitoring, backups, retention,
-  database location and edge rate limits before live use. Raw request logs/traces
+  database location and additional edge rate limits before wider release. The
+  invited identity-only test uses the application-level 120-starts/minute cap. Raw request logs/traces
   remain disabled because callback queries carry short-lived authorization codes.
   Enable only a reviewed redacted telemetry path, never request-payload logging.
 
@@ -111,3 +114,45 @@ Before enabling live access, independently review the integration, verify actual
 GitHub → Vocs Login → consent → MCP Hub flow in a real HTTPS browser, secure host
 cookies, denial/cancel/back behavior, expiry/revocation expectations and mobile
 layout. Mocked provider tests do not certify a real live flow or MCP interoperability.
+
+## Approved live-test record
+
+Activated 2026-11-08 at 17:37 UTC after explicit client/database/identity-only
+activation approval. PR #2 merged as `62d4a330ac4a532bcc75ec772f512c8ba6306cfa`.
+
+- Worker: `vocs-mcp-preview`; existing `mcp.vocs.io` custom-domain mapping preserved.
+- Initial activated version: `5eafc706-ea08-43fe-a060-e5710188df62`, at 100%.
+- Product D1: `vocs-mcp-login`, `e83b678d-6ae6-48e3-9eb3-a2ff8aae4094`, APAC,
+  read replication disabled. `0001_product_sessions.sql` is tracked in
+  `d1_migrations`. Permission records remain empty.
+- Bindings: only `LOGIN_DB`, `PRODUCT_LOGIN_ENABLED=true`, and
+  `PUBLIC_ORIGIN=https://mcp.vocs.io`. No provider keys, identity-provider secrets,
+  R2, capability Durable Objects or MCP tokens are attached to this Worker.
+- Registered exactly `mcp-hub` / `MCP Hub` /
+  `https://mcp.vocs.io/login/callback`; no existing registration was replaced.
+  The Vocs Login Worker and session tables were not changed.
+- Cleanup cron: `*/15 * * * *`. Logs, invocation logs, traces, logpush and tail
+  consumers disabled; query-string redaction configured as additional defense.
+  Workers.dev and version-preview URLs remain disabled.
+- Source and bundle verified against the merged source. Both exact-head GitHub CI
+  runs passed; 55 runtime tests, UI state checks, typecheck, formatting, backend and
+  preview dry runs, and local enabled/disabled bundle smoke passed.
+- Browser automation could not launch in the restricted executor; public fetch
+  inspection was unavailable. Actual GitHub → Vocs consent → MCP session remains
+  a user-browser verification step, not a claimed automated success.
+
+Test at `https://mcp.vocs.io/login`: continue to Vocs Login, approve sharing the
+account identifier with MCP Hub, and confirm the product account page reports
+permissions none. If Vocs Login first asks for GitHub sign-in, complete that,
+return to MCP Hub, and start again. Sign out of MCP Hub and confirm Vocs Login
+is still signed in. Do not test paid/provider actions.
+
+`npm run build:preview:live` validates the dedicated live configuration without
+deploying. Never deploy the disabled `wrangler.preview.jsonc` over the live test
+unintentionally. Before any later deployment, inspect current bindings and retain
+this product database and privacy settings.
+
+Rollback is scoped to MCP Hub: disable its product login flag or restore the prior
+preview version `bde7122f-2f1a-4f06-bb59-1ded0f003ef7`; disable the exact `mcp-hub`
+registration if withdrawing product access. Do not delete either database or
+alter Vocs Login sessions. Deployment rollback does not erase product D1 data.
