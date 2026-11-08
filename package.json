@@ -1,0 +1,38 @@
+{
+  "name": "@vocs/mcp-hub",
+  "version": "0.1.0",
+  "description": "Private invite-only Cloudflare MCP capability hub",
+  "directories": {
+    "doc": "docs",
+    "test": "test"
+  },
+  "scripts": {
+    "dev": "wrangler dev --env local --ip 127.0.0.1",
+    "typecheck": "tsc --noEmit",
+    "types": "wrangler types",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm test",
+    "build": "wrangler deploy --dry-run --env= --outdir dist",
+    "dev:portable": "npm run build && node scripts/local.mjs",
+    "format": "prettier --write src test scripts package.json tsconfig.json wrangler.jsonc vitest.config.ts docs README.md",
+    "pretypecheck": "npm run types"
+  },
+  "keywords": [],
+  "author": "",
+  "type": "module",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "jose": "^6.2.15",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.6.0",
+    "@types/node": "^26.6.6",
+    "miniflare": "^5.20261104.0-beta",
+    "prettier": "^3.9.10",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.12",
+    "wrangler": "^4.158.0"
+  },
+  "private": true
+}

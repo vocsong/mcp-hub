@@ -1,0 +1,37 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "vocs-mcp-hub",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-08",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": {
+    "APP_MODE": "disabled",
+    "PUBLIC_ORIGIN": "https://mcp.vocs.io",
+    "LIVE_PROVIDER": "disabled",
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "TENANTS", "class_name": "Tenant" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Tenant"] }],
+  "r2_buckets": [
+    { "binding": "AUDIO", "bucket_name": "vocs-mcp-private-audio" },
+  ],
+  "observability": { "enabled": false, "traces": { "enabled": false } },
+  "env": {
+    "local": {
+      "vars": {
+        "APP_MODE": "local",
+        "PUBLIC_ORIGIN": "http://localhost:8787",
+        "LIVE_PROVIDER": "disabled",
+      },
+      "durable_objects": {
+        "bindings": [{ "name": "TENANTS", "class_name": "Tenant" }],
+      },
+      "r2_buckets": [
+        { "binding": "AUDIO", "bucket_name": "vocs-mcp-private-audio" },
+      ],
+    },
+  },
+}
