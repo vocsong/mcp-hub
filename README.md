@@ -8,6 +8,15 @@ An invite-only, multi-tenant Cloudflare MCP hub. First capability: bounded OpenR
 
 Google/GitHub sign-in, reusable Vocs accounts, OAuth authorization/discovery/PKCE, remote Dots/Vocs Code compatibility, client token issuance/revocation, production monitoring and account deletion/export are release gates, not completed features. This preview uses a local-only demo identity, and includes a vetted `jose` JWT verifier for a future trusted issuer. Do not advertise it as a completed OAuth MCP server.
 
+## Shared Vocs Login integration
+
+An optional identity-only integration is prepared at `/login` and `/account`,
+with GitHub handled by `auth.vocs.io` and Google deferred. It is disabled by default
+and does not change the live mock or authorize MCP/paid capabilities. Product
+sessions last at most 30 minutes. See [the contract, security boundaries and exact
+activation gates](docs/SHARED-LOGIN.md). The older standalone Better Auth draft
+(PR #1) is not required for this integration.
+
 ## Run locally
 
 Requires Node 24+ and npm.

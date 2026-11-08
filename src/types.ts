@@ -1,5 +1,6 @@
 import type { Tenant } from "./tenant";
-export interface Env {
+import type { LoginEnv } from "./login/worker";
+export interface Env extends LoginEnv {
   TENANTS: DurableObjectNamespace<Tenant>;
   AUDIO: R2Bucket;
   APP_MODE: string;
