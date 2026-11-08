@@ -1,6 +1,6 @@
 # Secure login foundation (not activated)
 
-This branch adds an isolated Better Auth 1.7.18 Worker. It does not change the live mock, deploy login, provision D1, create provider applications, or connect browser sessions to MCP. There is no login UI yet. `/account` returns a minimal JSON identity for a signed-in, admitted user.
+This branch adds an isolated Better Auth 1.7.18 Worker. It does not change the live mock, deploy login, provision D1, create provider applications, or connect browser sessions to MCP. Accessible neutral login, generic error and account pages use same-origin static assets. `/api/account` returns a minimal JSON identity only for a signed-in, admitted user. The UI supports cancellation, retry, logout and explicit all-browser revocation confirmation; it does not collect credentials.
 
 ## Implemented boundary
 
@@ -27,3 +27,15 @@ This branch adds an isolated Better Auth 1.7.18 Worker. It does not change the l
 Required activation inputs: `AUTH_ENABLED=true`, exact `AUTH_ORIGIN`, `AUTH_DB`, a high-entropy `AUTH_SECRET` stored through an approved secret flow, and configured provider ID/secret pairs. The public repo contains no real credentials. `wrangler.auth.jsonc` intentionally has no routes, D1 binding, OAuth settings or enabled flag. Creating credentials, routing and activation require separate approval and the gates in LOGIN-RELEASE-PLAN.md.
 
 This is a backend foundation ready for further review, not a claim of production authentication readiness.
+
+## Login interface
+
+The neutral, responsive UI lives in `src/auth/ui.ts`, with external same-origin JS/CSS under `/auth-assets/`. CSP permits only those same-origin resources and fetches; inline code, framing and form submissions remain forbidden. Error-query content is never rendered. Account identity is populated only through `textContent` after an authenticated `/api/account` response, not embedded in HTML. All pages/assets are `no-store`.
+
+The login controls disable repeated submission, permit cancelling an in-flight initiation, and ignore late responses after cancellation/navigation. Provider redirects are restricted to the expected HTTPS authorization endpoints. A cancelled request may leave a short-lived server state record, which cannot create a session without completing the provider callback and expires through cleanup. Account pages revalidate on history restoration. Logout failures explicitly warn that the session may remain active; all-browser sign-out requires a separate confirmation.
+
+For visual QA only, run Node24 `node scripts/auth-ui-preview.mjs`. It listens on127.0.0.1:8789 and reuses the rendered UI, with clearly marked fixture identity and mock failure/logout responses. It is not imported by the auth Worker, does not authenticate anyone, does not set cookies and must not be deployed. `/login`, `/account`, `/login-error` and `/disabled` exercise the relevant layouts.
+
+### Browser UI checks
+
+The loopback-only fixture was inspected in Chromium: neutral layout, keyboard focus between provider buttons, canceled/retried login, generic error text without query-string reflection, disabled-provider state, account display, canceling all-session confirmation, successful mock logout/revocation and Back navigation. These checks use canned fixture responses, not a signed-in real account. Mobile viewport, assistive-technology certification and real-provider browser flows remain unverified.

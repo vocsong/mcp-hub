@@ -117,9 +117,10 @@ afterEach(() => {
 });
 describe("Vocs login boundary", () => {
   it("fails closed by default and on missing config", async () => {
-    expect((await worker.fetch(req("/account"), {})).status).toBe(503);
+    expect((await worker.fetch(req("/api/account"), {})).status).toBe(503);
     expect(
-      (await worker.fetch(req("/account"), { AUTH_ENABLED: "true" })).status,
+      (await worker.fetch(req("/api/account"), { AUTH_ENABLED: "true" }))
+        .status,
     ).toBe(503);
     expect(() =>
       authOptions({ ...cfg, AUTH_ORIGIN: "http://auth.example.test" }),
@@ -221,7 +222,7 @@ describe("Vocs login boundary", () => {
     expect(accounts[0].refreshToken).toBeNull();
     expect(accounts[0].idToken).toBeNull();
     const account = await worker.fetch(
-      req("/account", undefined, { cookie }),
+      req("/api/account", undefined, { cookie }),
       cfg,
     );
     expect(account.status).toBe(200);
@@ -236,7 +237,8 @@ describe("Vocs login boundary", () => {
       .bind(Date.now())
       .run();
     expect(
-      (await worker.fetch(req("/account", undefined, { cookie }), cfg)).status,
+      (await worker.fetch(req("/api/account", undefined, { cookie }), cfg))
+        .status,
     ).toBe(403);
   });
   it("rejects uninvited and unverified identities", async () => {
@@ -269,7 +271,8 @@ describe("Vocs login boundary", () => {
     );
     expect(revoke.status).toBe(200);
     expect(
-      (await worker.fetch(req("/account", undefined, { cookie }), cfg)).status,
+      (await worker.fetch(req("/api/account", undefined, { cookie }), cfg))
+        .status,
     ).toBe(401);
     const again = await login();
     const next = cookies(again);
@@ -278,8 +281,12 @@ describe("Vocs login boundary", () => {
       .bind(new Date(Date.now() - 1000).toISOString())
       .run();
     expect(
-      (await worker.fetch(req("/account", undefined, { cookie: next }), cfg))
-        .status,
+      (
+        await worker.fetch(
+          req("/api/account", undefined, { cookie: next }),
+          cfg,
+        )
+      ).status,
     ).toBe(401);
   });
   it("rechecks provider verification for returning users and isolates two accounts", async () => {
@@ -289,13 +296,13 @@ describe("Vocs login boundary", () => {
     const two = await login("two@example.test", 456);
     const a = (await (
       await worker.fetch(
-        req("/account", undefined, { cookie: cookies(one) }),
+        req("/api/account", undefined, { cookie: cookies(one) }),
         cfg,
       )
     ).json()) as { user: { id: string } };
     const b = (await (
       await worker.fetch(
-        req("/account", undefined, { cookie: cookies(two) }),
+        req("/api/account", undefined, { cookie: cookies(two) }),
         cfg,
       )
     ).json()) as { user: { id: string } };
@@ -309,7 +316,7 @@ describe("Vocs login boundary", () => {
     expect(
       (
         await worker.fetch(
-          req("/account", undefined, { cookie: cookies(one) }),
+          req("/api/account", undefined, { cookie: cookies(one) }),
           cfg,
         )
       ).status,
@@ -317,7 +324,7 @@ describe("Vocs login boundary", () => {
     expect(
       (
         await worker.fetch(
-          req("/account", undefined, { cookie: cookies(two) }),
+          req("/api/account", undefined, { cookie: cookies(two) }),
           cfg,
         )
       ).status,
@@ -436,5 +443,56 @@ describe("Vocs login boundary", () => {
     } finally {
       vi.mocked(Date.now).mockRestore();
     }
+  });
+  it("serves accessible same-origin UI without secrets or inline code", async () => {
+    const login = await worker.fetch(req("/login"), cfg);
+    const html = await login.text();
+    expect(login.status).toBe(200);
+    expect(html).toContain("Continue with GitHub");
+    expect(html).not.toContain("Continue with Google");
+    expect(html).not.toContain(cfg.GITHUB_CLIENT_SECRET);
+    expect(html).not.toContain("<style");
+    expect(html).toContain('aria-live="polite"');
+    expect(login.headers.get("content-security-policy")).toContain(
+      "script-src 'self'",
+    );
+    expect(login.headers.get("content-security-policy")).not.toContain(
+      "unsafe-inline",
+    );
+    expect(login.headers.get("cache-control")).toBe("no-store");
+    const error = await worker.fetch(
+      req(
+        "/login-error?error=%3Cscript%3Eevil%3C/script%3E&email=private@example.test",
+      ),
+      cfg,
+    );
+    expect(await error.text()).not.toMatch(/evil|private@example/);
+    const shell = await worker.fetch(req("/account"), cfg);
+    expect(shell.status).toBe(200);
+    expect(await shell.text()).not.toContain("one@example.test");
+    expect((await worker.fetch(req("/api/account"), cfg)).status).toBe(401);
+  });
+  it("offers no provider controls while login is disabled", async () => {
+    const response = await worker.fetch(req("/login"), {
+      ...cfg,
+      AUTH_ENABLED: "false",
+    });
+    expect(response.status).toBe(503);
+    const html = await response.text();
+    expect(html).toContain("not activated");
+    expect(html).not.toContain("data-provider=");
+    for (const path of ["/auth-assets/ui.js", "/auth-assets/ui.css"]) {
+      const asset = await worker.fetch(req(path), {});
+      expect(asset.status).toBe(200);
+      expect(asset.headers.get("x-content-type-options")).toBe("nosniff");
+    }
+  });
+  it("does not treat a query parameter as proof of logout", async () => {
+    const response = await worker.fetch(req("/login?signed_out=1"), cfg);
+    expect(await response.text()).not.toContain("You’re signed out");
+    const script = await worker.fetch(req("/auth-assets/ui.js"), cfg);
+    const source = await script.text();
+    expect(source).not.toContain("searchParams.get('signed_out')");
+    expect(source).toContain("catch{if(current!==accountGeneration)return;");
   });
 });

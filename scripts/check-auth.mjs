@@ -13,7 +13,15 @@ try {
   assert.equal(response.status, 503);
   assert.equal((await response.json()).error, "Login is not enabled");
   assert.equal(response.headers.get("cache-control"), "no-store");
-  console.log("Auth bundle runtime: disabled default verified");
+  const page = await mf.dispatchFetch("https://auth.example.test/login");
+  assert.equal(page.status, 503);
+  assert.match(await page.text(), /not activated/);
+  const asset = await mf.dispatchFetch(
+    "https://auth.example.test/auth-assets/ui.js",
+  );
+  assert.equal(asset.status, 200);
+  assert.match(asset.headers.get("content-type"), /javascript/);
+  console.log("Auth bundle runtime: disabled default and static UI verified");
 } finally {
   await mf.dispose();
 }

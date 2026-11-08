@@ -1,3 +1,4 @@
+import { authPage, authCSS, authJS } from "./ui";
 import { admitted, createAuth, type AuthEnv } from "./config";
 
 const securityHeaders = {
@@ -6,22 +7,51 @@ const securityHeaders = {
   "referrer-policy": "no-referrer",
   "x-content-type-options": "nosniff",
   "content-security-policy":
-    "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+    "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
   "strict-transport-security": "max-age=31536000",
 };
 const reply = (status: number, error: string) =>
   Response.json({ error }, { status });
 async function route(request: Request, env: AuthEnv): Promise<Response> {
-  if (env.AUTH_ENABLED !== "true") return reply(503, "Login is not enabled");
-  const auth = createAuth(env);
   if (request.url.length > 8192) return reply(414, "URL too long");
   const url = new URL(request.url);
+  if (request.method === "GET" && url.pathname === "/auth-assets/ui.css")
+    return new Response(authCSS, {
+      headers: { "content-type": "text/css; charset=utf-8" },
+    });
+  if (request.method === "GET" && url.pathname === "/auth-assets/ui.js")
+    return new Response(authJS, {
+      headers: { "content-type": "text/javascript; charset=utf-8" },
+    });
+  const html = (page: Parameters<typeof authPage>[0], status = 200) =>
+    new Response(
+      authPage(page, {
+        google:
+          env.AUTH_ENABLED === "true" &&
+          !!env.GOOGLE_CLIENT_ID &&
+          !!env.GOOGLE_CLIENT_SECRET,
+        github:
+          env.AUTH_ENABLED === "true" &&
+          !!env.GITHUB_CLIENT_ID &&
+          !!env.GITHUB_CLIENT_SECRET,
+      }),
+      { status, headers: { "content-type": "text/html; charset=utf-8" } },
+    );
+  if (env.AUTH_ENABLED !== "true")
+    return url.pathname === "/login" && request.method === "GET"
+      ? html("disabled", 503)
+      : reply(503, "Login is not enabled");
+  const auth = createAuth(env);
   if (url.origin !== env.AUTH_ORIGIN) return reply(400, "Invalid origin");
   if (url.pathname === "/openrouter" || url.pathname.startsWith("/mcp"))
     return reply(401, "A separate MCP client authorization is required");
-  if (url.pathname === "/login-error")
-    return reply(403, "Sign-in could not be completed");
-  if (url.pathname === "/account" && request.method === "GET") {
+  if (request.method === "GET" && url.pathname === "/login")
+    return html("login");
+  if (request.method === "GET" && url.pathname === "/login-error")
+    return html("error", 403);
+  if (request.method === "GET" && url.pathname === "/account")
+    return html("account");
+  if (url.pathname === "/api/account" && request.method === "GET") {
     const session = await auth.api.getSession({ headers: request.headers });
     if (!session) return reply(401, "Sign in required");
     if (
