@@ -66,3 +66,13 @@ Only explicitly scoped identities may invoke capabilities. MCP clients cannot ap
 Provider keys, encryption keys, OAuth secrets, JWTs, `.dev.vars*`, `.env*`, local `.wrangler` state, user text or generated audio. The repository may be public; application content remains private through access controls, not source secrecy.
 
 No deployment command is provided. `npm run build` is a dry run only. Deploying, configuring production credentials, DNS or persistent access requires an explicit separate release step.
+
+## Public design preview
+
+A separate deployable entry point, `src/preview.ts`, safely previews the neutral dashboard without exposing the unfinished authenticated backend. `npm run dev:preview` opens it locally at `http://localhost:8788`.
+
+`wrangler.preview.jsonc` targets the dedicated `vocs-mcp-preview` Worker and requested `mcp.vocs.io` custom domain. It contains **no secret, storage, account or provider bindings**. Deployment remains a separate explicit action after account/domain permissions are verified.
+
+The public preview accepts only GET/HEAD for static assets. All demo requests, simulated budget, approvals and generated test tones exist only in the browser tab's memory. Reload resets everything. No API-key input is present; `/openrouter` reports unavailable; `/api/*` is not implemented. The restrictive CSP blocks browser network connections. The UI clearly labels the mock, its lack of billing/authentication, and Cloudflare hosting metadata caveat. `/health` identifies the version and mock-only mode.
+
+The server-side MVP remains separate and disabled by default. Publishing the design preview does not complete OAuth, real TTS, multi-user production security or MCP client compatibility.

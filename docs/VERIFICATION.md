@@ -21,3 +21,11 @@ No live OpenRouter billing/audio test, remote Dots/Vocs Code auth flow, deployed
 ## Repository delivery
 
 The user-created GitHub repository `vocsong/mcp-hub` is public. Initial upload was rejected because the connected GitHub app had not been granted this repository. The user updated the app installation, the repository appeared in its accessible list, and the previously denied README creation then succeeded. No alternate write route was used. Source publication uses the authorized GitHub connector; production deployment is still disabled.
+
+## Neutral public-preview update
+
+- Professional neutral light theme replaces the green palette in both dashboard variants.
+- Separate static preview bundle has no Cloudflare bindings and cannot accept POST requests or provider keys.
+- 27 tests pass, including mock-only routes, restrictive CSP and absence of browser networking/persistent storage APIs.
+- Dedicated Miniflare smoke verifies the actual preview bundle starts and rejects mutations.
+- Real browser verified prepare, changed-text rejection, exact approval, execute, test-tone download, delete, cancel, and full reset on reload. The public preview intentionally has no account/backend state.
