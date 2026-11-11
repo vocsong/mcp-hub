@@ -76,6 +76,7 @@ async function start(s = status()) {
   await tick();
   await settle(h, s);
   if (s.clientAccess) await settle(h, { clients: [] });
+  if (s.oauthAccess) await settle(h, { grants: [] });
   return h;
 }
 const submit = (h, id) => h.elements[id].onsubmit({ preventDefault() {} });
@@ -212,9 +213,7 @@ for (const event of [
   assert.ok(h.elements["scope-audio"].checked);
 }
 assert.doesNotMatch(script, /localStorage|sessionStorage|clipboard|console\./);
-console.log(
-  "Dashboard fixture checks passed: consent, demo controls, production locks, repeated requests, errors, revocation, hidden/navigation stale responses, token expiry, and unsaved edits.",
-);
+
 // Discard during issuance invalidates the late secret without changing server grant state.
 {
   const h = await start();
@@ -239,3 +238,57 @@ console.log(
   await settle(h, { clients: [] });
   assert.equal(h.elements.budget.value, "0.03");
 }
+
+{
+  const config = status({
+    clientAccess: false,
+    oauthAccess: true,
+    oauthResource: "https://mcp.vocs.io/openrouter",
+  });
+  const h = await start(config);
+  assert.equal(h.elements["clients-section"].hidden, true);
+  assert.equal(h.elements["oauth-section"].hidden, false);
+  assert.equal(h.elements["oauth-resource"].textContent, config.oauthResource);
+  h.elements.refresh.onclick();
+  await tick();
+  await settle(h, config);
+  const grant = {
+    id: "oauth-grant",
+    clientId: "<img src=x>",
+    scopes: ["models:read"],
+    expiresAt: Date.now() + 60000,
+    revokedAt: null,
+  };
+  await settle(h, { grants: [grant] });
+  assert.ok(
+    h.elements["oauth-grants"].children[0].children[0].textContent.includes(
+      "<img src=x>",
+    ),
+  );
+  const revoke = h.elements["oauth-grants"].children[0].children[1].onclick;
+  revoke();
+  revoke();
+  assert.equal(
+    h.calls.filter((c) => c.url === "/api/oauth/grants/oauth-grant").length,
+    1,
+  );
+  await settle(h, { revoked: true });
+  await settle(h, config);
+  await settle(h, { grants: [{ ...grant, revokedAt: Date.now() }] });
+  assert.equal(h.elements["oauth-grants"].children[0].children.length, 1);
+  h.elements.refresh.onclick();
+  await tick();
+  await settle(h, config);
+  h.document.hidden = true;
+  h.events.visibilitychange();
+  await settle(h, { grants: [grant] });
+  assert.equal(
+    h.elements["oauth-grants"].children[0].children.length,
+    1,
+    "Stale OAuth list cannot restore active controls",
+  );
+}
+
+console.log(
+  "Dashboard fixture checks passed: key consent, production locks, repeated requests, errors, manual and OAuth revocation, hidden/navigation stale responses, token expiry, and unsaved edits.",
+);

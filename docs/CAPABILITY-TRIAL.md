@@ -94,7 +94,16 @@ Physical cleanup can still be delayed by platform failures. Private bucket acces
 lifecycle backup deletion, backup retention and recovery tests remain deployment
 gates. Manual deletion retains an idempotency tombstone, not a way to rerun a job.
 
-## Manual MCP client trial
+## Standards-based MCP OAuth trial
+
+The private backend now implements an additional default-disabled OAuth flow using
+the official Cloudflare authorization-server/resource-server library. Discovery,
+S256 PKCE, browser consent, scoped authorization-code grants, five-minute access
+tokens and primary-D1-backed revocation are exercised with the actual MCP SDK.
+See [MCP-OAUTH.md](MCP-OAUTH.md) for the detailed contract and remaining gates.
+OAuth-mode clients receive no dashboard management permission or refresh token.
+
+## Optional manual MCP client trial
 
 GET/POST /api/clients and DELETE /api/clients/{id} manage browser-owned grants.
 Explicit consent selects only `dots` or `vocs-code` and a subset of current
@@ -116,9 +125,13 @@ Bearer header. Cookies, URL tokens, malformed/mixed credentials, foreign origins
 wrong resources and management attempts are rejected. Audio also requires the
 audio scope. MCP clients cannot save keys, change policy or approve speech.
 
-This is **not OAuth discovery or verified Dots/Vocs Code interoperability**. No
-client configuration was installed. A client must support secure manual bearer
-configuration; clients requiring OAuth need a separately reviewed OAuth server.
+This manual path is **not OAuth or verified Dots/Vocs Code interoperability**.
+When OAUTH_ENABLED=true, the dashboard shows standard OAuth connection/grant
+management instead; new manual issuance is blocked and the OAuth resource does
+not accept these manual credentials. GET/DELETE client APIs remain available to
+inspect/revoke pre-existing five-minute manual grants.
+No actual client configuration was installed. A client using the manual path must
+support secure manual bearer configuration.
 Do not paste tokens into chat, repository config, command history or URLs. The
 local router tests exercise real MCP initialize/tools/list/call with scoped
 credentials, but cannot certify either external client's supported flow.
@@ -128,15 +141,16 @@ credentials, but cannot certify either external client's supported flow.
 1. Verify real GitHub → Vocs consent → product session and two-account isolation,
    sign-out, cancellation, back navigation and mobile layout.
 2. Review residual source-revocation behavior and separately approve staging
-   deployment, exact grants, product DB migration 0002, encryption secret,
+   deployment, exact grants, product DB migrations 0002/0003, dedicated OAuth KV, encryption secret,
    private R2/lifecycle, capability DO binding and scrubbed operational controls.
    Do not deploy the private Worker over the identity-only mock.
 3. Run the approved secure BYO-key connection, then a specifically confirmed tiny
    live TTS request with a provider-side spend limit. No key should pass through chat.
-4. Test read-only manual bearer access in actual Dots and Vocs Code if supported,
-   then scoped speech, authenticated audio and immediate local revocation. Record
-   unsupported auth flows honestly; do not claim OAuth compatibility.
-5. Production deployment, broader budgets, persistent credentials, OAuth, billing
+4. Test discovery, login/consent, read-only OAuth access and scope escalation in
+   actual Dots and Vocs Code, then separately approved speech, authenticated audio,
+   logout and local revocation. Verify CIMD/private_key_jwt where required. Record
+   unsupported flows honestly; an SDK fixture alone does not certify these clients.
+5. Production deployment, broader budgets, persistent credentials, billing
    reconciliation, key rotation/recovery, account export/deletion and external
    security qualification remain separate decisions.
 

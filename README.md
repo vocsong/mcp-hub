@@ -6,16 +6,19 @@ An invite-only Cloudflare MCP hub in development. A browser-only mock is live at
 
 **Runnable local preview, not a production service.** The local dashboard exercises real MCP SDK transport, SQLite Durable Objects, approval/budget controls and private R2 audio. Demo audio is a generated test tone, **not actual speech**. No paid requests were made. Production and live provider calls are disabled by default. The OpenRouter adapter is implemented and tested against mocked HTTP responses, not a live account.
 
-MCP OAuth authorization/discovery, remote Dots/Vocs Code compatibility, production monitoring and account deletion/export are release gates, not completed features. Shared Vocs Login handles GitHub-first browser identity separately; Google is deferred. This preview uses a local-only demo identity, and includes a vetted `jose` JWT verifier for a future trusted issuer. Do not advertise it as a completed OAuth MCP server.
+Standards-based MCP OAuth authorization/discovery is implemented behind disabled flags and tested with the actual MCP SDK locally. Remote Dots/Vocs Code compatibility, real two-account login verification, production monitoring and account deletion/export remain release gates. Shared Vocs Login handles GitHub-first browser identity separately; Google is deferred. This preview uses a local-only demo identity, and includes a vetted `jose` JWT verifier for a future trusted issuer. Do not advertise the live preview as an active OAuth MCP server.
 
 ## Disabled capability trial
 
 The next phase adds an explicit account authorization bridge, consent-based BYO
-OpenRouter key management, short-lived scoped manual client tokens, and a
+OpenRouter key management, short-lived OAuth client grants, and a
 one-request production trial with a $0.10 reservation, required approval, 300-byte
 text and one-hour private audio. It remains off and is not deployed. Read the
 [security contract, local verification and release gates](docs/CAPABILITY-TRIAL.md).
-Manual bearer-token support is not verified Dots/Vocs Code integration or OAuth.
+The [OAuth flow, protocol verification and remaining client gates](docs/MCP-OAUTH.md)
+cover discovery, authorization code + S256 PKCE, consent, scope and revocation.
+The older manual-token trial remains a separate fallback when OAuth is off; neither
+path is deployed or verified in actual Dots/Vocs Code.
 
 ## Shared Vocs Login integration
 
@@ -57,7 +60,7 @@ Streamable HTTP POST `/openrouter` uses the official MCP TypeScript SDK, statele
 - `openrouter_models`: reviewed presets, currently Voxtral Mini TTS with `en_paul_neutral`.
 - `openrouter_speech`: `text` (maximum 2,000 UTF-8 bytes), `voice`, `requestId` (UUID). Returns pending approval, completed authenticated audio path, or uncertain status.
 
-Only explicitly scoped identities may invoke capabilities. MCP clients cannot approve requests, modify budgets or save keys. Audio URLs require authentication; these are not public bearer links. Some clients will need a future authenticated resource/download integration. No remote-client compatibility claim is made yet.
+Only explicitly scoped identities may invoke capabilities. MCP clients cannot approve requests, modify budgets or save keys. Audio URLs require authentication; these are not public bearer links. OAuth-mode audio is served below the same `/openrouter` resource at `/openrouter/audio/{id}` with the `audio:read` scope. Actual client download support still needs verification. No remote-client compatibility claim is made yet.
 
 ## Safe assumptions
 

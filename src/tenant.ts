@@ -276,7 +276,13 @@ export class Tenant extends DurableObject<Env> {
         ? { approvalPath: "/dashboard", approvalExpires: job.expires }
         : {}),
       ...(job.artifact
-        ? { audioPath: "/audio/" + job.artifact, expires: job.audioExpires }
+        ? {
+            audioPath:
+              (this.env.OAUTH_ENABLED === "true"
+                ? "/openrouter/audio/"
+                : "/audio/") + job.artifact,
+            expires: job.audioExpires,
+          }
         : {}),
       demo: this.env.LIVE_PROVIDER !== "enabled",
     };

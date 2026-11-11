@@ -48,3 +48,31 @@ The user-created GitHub repository `vocsong/mcp-hub` is public. Initial upload w
   login or final visual/mobile QA was performed in this phase.
 - See CAPABILITY-TRIAL.md for release gates and residual revocation policy. Tests
   do not constitute external security qualification or approval to activate.
+
+## Disabled standards-based OAuth phase — 2026-11-11
+
+- Official Cloudflare OAuth provider 1.2.4 pinned; no custom OAuth token crypto.
+- 102 workerd/D1/KV/DO/R2 tests pass, plus generated types/TypeScript, login UI
+  fixtures and dashboard lifecycle fixtures. Backend/preview/live-config dry-run
+  builds, unchanged public-preview runtime smoke and diff checks pass.
+- Actual MCP SDK flow verifies RFC 9728/8414 discovery, public registration,
+  SDK-generated S256 PKCE, browser consent, callback state/issuer validation, code
+  exchange, initialization, tool listing, model read, insufficient-scope challenge
+  and browser revocation. No refresh token or dashboard authority is issued.
+- A separate ephemeral-key fixture verifies CIMD/JWKS + ES256 private_key_jwt code
+  exchange and authenticated RFC 7009 revocation, including invalid signatures,
+  wrong-client non-disclosure, a missing KV record and restored stale KV data.
+  Only local fixture URLs are accepted. No provider or identity network call runs.
+- Independent review identified and fixed foreign-Origin/mixed-credential routing,
+  PKCE syntax validation and an eventually-consistent KV revocation gap. Token
+  hashes must now be registered on the D1 primary before issuance responses and
+  resource access. The independent recheck found no remaining high-confidence
+  blocker in those fixes. This is not external security qualification.
+- Read-only HTTPS/browser checks of the existing live login found identity-only
+  GitHub login and an anonymous product session. No real authenticated session or
+  two-account test credentials were available. Successful live account isolation,
+  actual Dots/Vocs Code login, mobile QA and cross-region revocation remain open.
+- All capability/OAuth/provider flags remain disabled in checked-in configuration.
+  No live migration, KV provisioning, credential entry, paid request or deployment
+  occurred. See MCP-OAUTH.md for exact release gates, residual upstream revocation
+  and operational logging limitations.

@@ -7,6 +7,9 @@ export interface Env extends LoginEnv {
   PUBLIC_ORIGIN: string;
   LIVE_PROVIDER: string;
   CAPABILITY_AUTH_ENABLED?: string;
+  OAUTH_ENABLED?: string;
+  OAUTH_DCR_ENABLED?: string;
+  OAUTH_KV?: KVNamespace;
   KEY_ENCRYPTION_KEY?: string;
   AUTH_ISSUER?: string;
   AUTH_AUDIENCE?: string;

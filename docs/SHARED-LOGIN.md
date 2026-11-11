@@ -8,7 +8,9 @@ MCP Hub PR #1. That draft is not required or merged by this change.
 The identity-only live wrapper remains unchanged. The separate private backend
 now contains a default-disabled capability phase; see [CAPABILITY-TRIAL.md](CAPABILITY-TRIAL.md)
 for its explicit grants, five-minute mutation/client freshness, local revocation
-and remaining activation gates. The identity-only statements below describe the
+and remaining activation gates. [MCP-OAUTH.md](MCP-OAUTH.md) describes the separate,
+disabled MCP OAuth server that consumes these product sessions. Vocs Login itself
+is still an identity handoff, not the MCP OAuth issuer. The identity-only statements below describe the
 current live wrapper, not an authorization to activate that backend.
 
 ## What is ready
