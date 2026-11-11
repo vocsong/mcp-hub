@@ -46,7 +46,9 @@ export async function synthesize(
   validateLiveProvider(env);
   const response = await fetch("https://openrouter.ai/api/v1/audio/speech", {
     method: "POST",
-    redirect: "error",
+    // Workers supports manual but not error. Never forward the key on a redirect;
+    // every non-2xx response, including 3xx, is rejected below without a retry.
+    redirect: "manual",
     signal: AbortSignal.timeout(25000),
     headers: {
       Authorization: `Bearer ${key}`,

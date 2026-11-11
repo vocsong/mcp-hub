@@ -232,7 +232,10 @@ async function callback(
     if (!transaction) return failed();
     const exchange = await fetch(profile.issuer + "/sso/token", {
       method: "POST",
-      redirect: "error",
+      // Workers supports follow/manual, not the browser-only error mode.
+      // Never follow an identity redirect with this one-time code/verifier;
+      // the non-2xx guard below rejects every 3xx response.
+      redirect: "manual",
       signal: AbortSignal.timeout(10_000),
       headers: {
         "Content-Type": "application/json",
