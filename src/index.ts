@@ -1,4 +1,9 @@
 import { handleLogin, cleanupLogin } from "./login/worker";
+import {
+  handleClientManagement,
+  cleanupClients,
+  capabilityAuthEnabled,
+} from "./authorization";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z, ZodError } from "zod";
@@ -27,6 +32,12 @@ const knownErrors: Record<string, number> = {
   provider_key_required: 409,
   request_capacity_reached: 429,
   real_keys_forbidden_in_demo: 400,
+  trial_policy_required: 400,
+  trial_text_too_long: 400,
+  trial_budget_exhausted: 429,
+  live_provider_disabled: 503,
+  key_update_cancelled: 409,
+  price_review_required: 503,
 };
 const rpcFault = (e: unknown) =>
   e instanceof Error && knownErrors[e.message]
@@ -39,6 +50,8 @@ export default {
     try {
       const login = await handleLogin(req, env);
       if (login) return login;
+      const client = await handleClientManagement(req, env);
+      if (client) return client;
       const who = await identity(req, env);
       const url = new URL(req.url);
       const path = url.pathname;
@@ -80,7 +93,8 @@ export default {
                       {
                         id: MODEL,
                         voices: ["en_paul_neutral"],
-                        maxInputBytes: 2000,
+                        maxInputBytes:
+                          env.APP_MODE === "production" ? 300 : 2000,
                       },
                     ],
                     demo: env.LIVE_PROVIDER !== "enabled",
@@ -181,8 +195,27 @@ export default {
           },
         );
       if (path === "/api/status" && req.method === "GET")
-        return json(await tenant.status());
+        return json({
+          ...(await tenant.status()),
+          clientAccess: capabilityAuthEnabled(env),
+        });
       if (path.startsWith("/api/")) {
+        if (
+          env.APP_MODE === "production" &&
+          req.headers.get("Origin") !== env.PUBLIC_ORIGIN
+        )
+          throw new Fault("invalid_origin", 403);
+        if (
+          req.method === "POST" &&
+          req.headers.get("Content-Type")?.split(";")[0].trim() !==
+            "application/json"
+        )
+          throw new Fault("invalid_request", 400);
+        if (
+          ["/api/speech", "/api/approve"].includes(path) &&
+          !who.scopes.includes("speech:write")
+        )
+          throw new Fault("insufficient_scope", 403);
         if (req.headers.get("X-Vocs-Intent") !== "dashboard")
           throw new Fault("intent_header_required", 403);
         const value =
@@ -231,5 +264,6 @@ export default {
   },
   async scheduled(_event: ScheduledController, env: Env): Promise<void> {
     await cleanupLogin(env);
+    if (capabilityAuthEnabled(env)) await cleanupClients(env);
   },
 } satisfies ExportedHandler<Env>;

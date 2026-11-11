@@ -51,7 +51,7 @@ function base64url(value: Uint8Array): string {
     .replace(/=+$/, "");
 }
 const random = () => base64url(crypto.getRandomValues(new Uint8Array(32)));
-async function hash(value: string): Promise<string> {
+export async function hashLoginToken(value: string): Promise<string> {
   return base64url(
     new Uint8Array(
       await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)),
@@ -109,26 +109,27 @@ function emptyObject(value: unknown): boolean {
     Object.keys(value).length === 0
   );
 }
-interface Session {
+export interface LoginSession {
+  token_hash: string;
   issuer: string;
   subject: string;
   authenticated_at: number;
   expires_at: number;
 }
-async function session(
+export async function readLoginSession(
   request: Request,
-  db: D1Database,
-): Promise<Session | null> {
+  db: D1Database | D1DatabaseSession,
+): Promise<LoginSession | null> {
   const token = readCookie(request, SESSION_COOKIE);
   if (!token) return null;
   return db
     .prepare(
-      `SELECT s.issuer, s.subject, s.authenticated_at, s.expires_at
+      `SELECT s.token_hash, s.issuer, s.subject, s.authenticated_at, s.expires_at
     FROM hub_login_session s JOIN hub_login_principal p ON p.issuer = s.issuer AND p.subject = s.subject
     WHERE s.token_hash = ? AND s.issuer = ? AND s.expires_at > ? AND p.disabled_at IS NULL`,
     )
-    .bind(await hash(token), VOCS_ISSUER, Date.now())
-    .first<Session>();
+    .bind(await hashLoginToken(token), VOCS_ISSUER, Date.now())
+    .first<LoginSession>();
 }
 async function start(
   request: Request,
@@ -154,19 +155,19 @@ async function start(
   await db.batch([
     db
       .prepare("DELETE FROM hub_login_session WHERE browser_hash = ?")
-      .bind(previous ? await hash(previous) : ""),
+      .bind(previous ? await hashLoginToken(previous) : ""),
     db
       .prepare(
         "DELETE FROM hub_login_transaction WHERE browser_hash = ? OR expires_at <= ?",
       )
-      .bind(previous ? await hash(previous) : "", Date.now()),
+      .bind(previous ? await hashLoginToken(previous) : "", Date.now()),
     db
       .prepare(
         "INSERT INTO hub_login_transaction(state_hash, browser_hash, verifier, expires_at) VALUES (?, ?, ?, ?)",
       )
       .bind(
-        await hash(state),
-        await hash(browser),
+        await hashLoginToken(state),
+        await hashLoginToken(browser),
         verifier,
         Date.now() + FLOW_MS,
       ),
@@ -176,7 +177,7 @@ async function start(
     client_id: PRODUCT_CLIENT,
     redirect_uri: productOrigin + "/login/callback",
     state,
-    code_challenge: await hash(verifier),
+    code_challenge: await hashLoginToken(verifier),
     code_challenge_method: "S256",
   }).toString();
   const result = json({ url: destination.href });
@@ -217,7 +218,11 @@ async function callback(
       .prepare(
         "UPDATE hub_login_transaction SET claimed = 1 WHERE state_hash = ? AND browser_hash = ? AND expires_at > ? AND claimed = 0 RETURNING verifier",
       )
-      .bind(await hash(params.get("state")!), await hash(browser), Date.now())
+      .bind(
+        await hashLoginToken(params.get("state")!),
+        await hashLoginToken(browser),
+        Date.now(),
+      )
       .first<{ verifier: string }>();
     if (!transaction) return failed();
     const exchange = await fetch(VOCS_ISSUER + "/sso/token", {
@@ -278,8 +283,8 @@ async function callback(
         .bind(
           VOCS_ISSUER,
           value.subject,
-          await hash(params.get("state")!),
-          await hash(browser),
+          await hashLoginToken(params.get("state")!),
+          await hashLoginToken(browser),
           Date.now(),
         ),
       db
@@ -289,26 +294,32 @@ async function callback(
         AND EXISTS (SELECT 1 FROM hub_login_transaction WHERE state_hash = ? AND browser_hash = ? AND claimed = 1 AND expires_at > ?)`,
         )
         .bind(
-          await hash(token),
-          await hash(browser),
+          await hashLoginToken(token),
+          await hashLoginToken(browser),
           authenticated,
           expires,
           VOCS_ISSUER,
           value.subject,
-          await hash(params.get("state")!),
-          await hash(browser),
+          await hashLoginToken(params.get("state")!),
+          await hashLoginToken(browser),
           Date.now(),
         ),
       db
         .prepare(
           "DELETE FROM hub_login_transaction WHERE state_hash = ? AND browser_hash = ?",
         )
-        .bind(await hash(params.get("state")!), await hash(browser)),
+        .bind(
+          await hashLoginToken(params.get("state")!),
+          await hashLoginToken(browser),
+        ),
       db
         .prepare(
           "DELETE FROM hub_login_session WHERE token_hash = ? AND EXISTS (SELECT 1 FROM hub_login_session WHERE token_hash = ?)",
         )
-        .bind(previous ? await hash(previous) : "", await hash(token)),
+        .bind(
+          previous ? await hashLoginToken(previous) : "",
+          await hashLoginToken(token),
+        ),
     ]);
     if (results[1].meta.changes !== 1) return failed();
     const result = redirect("/account");
@@ -357,7 +368,7 @@ export async function handleLogin(
       if (url.pathname === "/login/callback")
         return callback(request, env.LOGIN_DB, productOrigin);
       if (url.pathname === "/login/session") {
-        const active = await session(request, env.LOGIN_DB);
+        const active = await readLoginSession(request, env.LOGIN_DB);
         return active
           ? json({
               subject: active.subject,
@@ -409,12 +420,12 @@ export async function handleLogin(
       await env.LOGIN_DB.batch([
         env.LOGIN_DB.prepare(
           "DELETE FROM hub_login_transaction WHERE browser_hash = ?",
-        ).bind(browser ? await hash(browser) : ""),
+        ).bind(browser ? await hashLoginToken(browser) : ""),
         env.LOGIN_DB.prepare(
           "DELETE FROM hub_login_session WHERE browser_hash = ? OR token_hash = ?",
         ).bind(
-          browser ? await hash(browser) : "",
-          token ? await hash(token) : "",
+          browser ? await hashLoginToken(browser) : "",
+          token ? await hashLoginToken(token) : "",
         ),
       ]);
       const result = json({ ok: true });

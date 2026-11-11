@@ -9,6 +9,7 @@
   "vars": {
     "APP_MODE": "disabled",
     "PRODUCT_LOGIN_ENABLED": "false",
+    "CAPABILITY_AUTH_ENABLED": "false",
     "PUBLIC_ORIGIN": "https://mcp.vocs.io",
     "LIVE_PROVIDER": "disabled",
   },
@@ -24,6 +25,8 @@
     "local": {
       "vars": {
         "APP_MODE": "local",
+        "PRODUCT_LOGIN_ENABLED": "false",
+        "CAPABILITY_AUTH_ENABLED": "false",
         "PUBLIC_ORIGIN": "http://localhost:8787",
         "LIVE_PROVIDER": "disabled",
       },

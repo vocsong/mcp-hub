@@ -29,3 +29,22 @@ The user-created GitHub repository `vocsong/mcp-hub` is public. Initial upload w
 - 27 tests pass, including mock-only routes, restrictive CSP and absence of browser networking/persistent storage APIs.
 - Dedicated Miniflare smoke verifies the actual preview bundle starts and rejects mutations.
 - Real browser verified prepare, changed-text rejection, exact approval, execute, test-tone download, delete, cancel, and full reset on reload. The public preview intentionally has no account/backend state.
+
+## Disabled capability phase — 2026-11-11
+
+- Final aggregate check: generated runtime types, TypeScript, 84 workerd/D1/DO/R2 tests,
+  login UI fixture checks and new dashboard lifecycle fixture checks pass.
+- Private backend dry-run build, unchanged public-preview runtime smoke, and
+  identity-only live-config dry-run build pass. No deployment occurred.
+- Independent source review found public-template coupling, delayed cleanup and
+  failed-replacement admission risks. Fixed with frozen public-template isolation,
+  nearest-expiry scheduling and cancellation/revision checks before reservation;
+  regression checks pass. No remaining blocking finding in recheck.
+- Live read-only verification confirms the existing approved identity-only version
+  and bindings, zero capability grants/principals/active sessions. No live login
+  success is inferred. No production database or Worker was changed.
+- Mocked provider tests cover paid-path logic without provider calls. No real key,
+  actual OpenRouter billing/audio, actual Dots/Vocs Code setup, real HTTPS browser
+  login or final visual/mobile QA was performed in this phase.
+- See CAPABILITY-TRIAL.md for release gates and residual revocation policy. Tests
+  do not constitute external security qualification or approval to activate.

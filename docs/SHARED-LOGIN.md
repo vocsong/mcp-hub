@@ -5,6 +5,12 @@ This integration consumes the first-party identity handoff from
 It replaces the need to activate the duplicate Better Auth service proposed in
 MCP Hub PR #1. That draft is not required or merged by this change.
 
+The identity-only live wrapper remains unchanged. The separate private backend
+now contains a default-disabled capability phase; see [CAPABILITY-TRIAL.md](CAPABILITY-TRIAL.md)
+for its explicit grants, five-minute mutation/client freshness, local revocation
+and remaining activation gates. The identity-only statements below describe the
+current live wrapper, not an authorization to activate that backend.
+
 ## What is ready
 
 `/login` and `/account` are optional product-account pages, served by both the

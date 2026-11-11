@@ -1,5 +1,12 @@
 # Security and release gates
 
+## Disabled capability phase
+
+[CAPABILITY-TRIAL.md](CAPABILITY-TRIAL.md) specifies the new default-disabled
+product-session bridge, scoped manual token revocation, key lifecycle and narrower
+production trial. Its policy supersedes the general local-preview budget/retention
+below when APP_MODE=production. No new capability has been deployed.
+
 ## Trust boundaries
 
 The outer Worker validates exact configured origin/host and a signed JWT with issuer, audience, expiry, issued-at, algorithm allowlist and invitation allowlist. It hashes issuer + subject to route a tenant Durable Object. Caller-supplied tenant IDs are never accepted by HTTP or MCP. Worker bindings are not exposed as public RPC services.
@@ -22,7 +29,7 @@ The $0.10 reservation is not an upstream cap. Price changes and unknown outcomes
 
 Text exists only in request/runtime memory and the requesting browser. The hub retains no text/transcript. HMAC is not exposed through dashboard and protects against offline guessing without the master key.
 
-R2 objects use opaque tenant/artifact keys. Metadata and scheduled cleanup are persisted before upload to cover an upload/commit crash. Expired objects cannot be downloaded immediately at the application layer. Physical deletion runs on an hourly durable alarm, which active traffic cannot postpone. This means physical deletion may lag the chosen expiry by up to approximately one hour in normal operation, and longer on platform failure. Configure private bucket lifecycle deletion as an independent backup before production. Do not enable r2.dev or public custom domains on the bucket.
+R2 objects use opaque tenant/artifact keys. Metadata and scheduled cleanup are persisted before upload to cover an upload/commit crash. Expired objects cannot be downloaded immediately at the application layer. Physical deletion uses a durable alarm targeting the nearest audio expiry (with hourly maintenance), which active traffic cannot postpone. Platform failures can delay physical deletion. Configure private bucket lifecycle deletion as an independent backup before production. Do not enable r2.dev or public custom domains on the bucket.
 
 Alarms remove idempotency records after 30 days; clients must not reuse old request IDs. Keep default bucket lifecycle to a short maximum that covers delayed/orphaned uploads. Test failure between R2 upload and SQLite final commit. No content appears in object metadata.
 

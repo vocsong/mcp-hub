@@ -6,7 +6,16 @@ An invite-only Cloudflare MCP hub in development. A browser-only mock is live at
 
 **Runnable local preview, not a production service.** The local dashboard exercises real MCP SDK transport, SQLite Durable Objects, approval/budget controls and private R2 audio. Demo audio is a generated test tone, **not actual speech**. No paid requests were made. Production and live provider calls are disabled by default. The OpenRouter adapter is implemented and tested against mocked HTTP responses, not a live account.
 
-MCP OAuth authorization/discovery, remote Dots/Vocs Code compatibility, client token issuance/revocation, production monitoring and account deletion/export are release gates, not completed features. Shared Vocs Login handles GitHub-first browser identity separately; Google is deferred. This preview uses a local-only demo identity, and includes a vetted `jose` JWT verifier for a future trusted issuer. Do not advertise it as a completed OAuth MCP server.
+MCP OAuth authorization/discovery, remote Dots/Vocs Code compatibility, production monitoring and account deletion/export are release gates, not completed features. Shared Vocs Login handles GitHub-first browser identity separately; Google is deferred. This preview uses a local-only demo identity, and includes a vetted `jose` JWT verifier for a future trusted issuer. Do not advertise it as a completed OAuth MCP server.
+
+## Disabled capability trial
+
+The next phase adds an explicit account authorization bridge, consent-based BYO
+OpenRouter key management, short-lived scoped manual client tokens, and a
+one-request production trial with a $0.10 reservation, required approval, 300-byte
+text and one-hour private audio. It remains off and is not deployed. Read the
+[security contract, local verification and release gates](docs/CAPABILITY-TRIAL.md).
+Manual bearer-token support is not verified Dots/Vocs Code integration or OAuth.
 
 ## Shared Vocs Login integration
 
