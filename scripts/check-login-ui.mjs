@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import vm from "node:vm";
-import { loginScript } from "../src/login/ui.ts";
-function harness(account = false) {
+import {
+  loginScript,
+  loginScriptForProfile,
+  loginHtml,
+  loginHtmlForProfile,
+  accountHtml,
+  accountHtmlForProfile,
+} from "../src/login/ui.ts";
+import { PRODUCTION_LOGIN, STAGING_LOGIN } from "../src/login/profile.ts";
+function harness(account = false, source = loginScript) {
   const listeners = {};
   const elements = Object.fromEntries(
     ["status", "start", "cancel", "logout", "account"]
@@ -26,7 +34,7 @@ function harness(account = false) {
   const calls = [],
     pending = [],
     navigation = [];
-  vm.runInNewContext(loginScript, {
+  vm.runInNewContext(source, {
     document: {
       querySelector: (selector) => elements[selector.slice(1)] || null,
     },
@@ -108,6 +116,64 @@ const response = (data) => ({ ok: true, json: async () => data });
   );
   assert.equal(h.elements.logout.hidden, true);
 }
+// Production UI is unchanged; staging accepts only its pinned issuer/client/callback.
+assert.equal(loginScriptForProfile(PRODUCTION_LOGIN), loginScript);
+assert.equal(loginHtmlForProfile(false, PRODUCTION_LOGIN), loginHtml(false));
+assert.equal(accountHtmlForProfile(PRODUCTION_LOGIN), accountHtml);
+assert.match(
+  loginHtmlForProfile(false, STAGING_LOGIN),
+  /existing staging account/,
+);
+assert.match(accountHtmlForProfile(STAGING_LOGIN), /models:read/);
+assert.match(
+  loginHtmlForProfile(false, STAGING_LOGIN),
+  /<h1>Sign in to MCP Hub staging<\/h1>/,
+);
+assert.match(
+  accountHtmlForProfile(STAGING_LOGIN),
+  /<h1>Your staging MCP Hub account<\/h1>/,
+);
+const stagingScript = loginScriptForProfile(STAGING_LOGIN);
+const valid = new URL(STAGING_LOGIN.issuer + "/authorize");
+valid.search = new URLSearchParams({
+  client_id: STAGING_LOGIN.clientId,
+  redirect_uri: STAGING_LOGIN.origin + "/login/callback",
+}).toString();
+const bad = [
+  "https://auth.vocs.io/authorize",
+  "https://evil.test/authorize",
+  valid.href.replace("/authorize?", "/other?"),
+  valid.href.replace("mcp-hub-staging", "mcp-hub"),
+  valid.href.replace(
+    encodeURIComponent(STAGING_LOGIN.origin),
+    encodeURIComponent(PRODUCTION_LOGIN.origin),
+  ),
+  valid.href + "&client_id=mcp-hub",
+  valid.href +
+    "&redirect_uri=" +
+    encodeURIComponent(PRODUCTION_LOGIN.origin + "/login/callback"),
+];
+for (const url of [...bad, valid.href]) {
+  const h = harness(false, stagingScript);
+  const started = h.elements.start.handlers.click();
+  h.pending.shift().resolve(response({ url }));
+  await started;
+  assert.deepEqual(h.navigation, url === valid.href ? [url] : []);
+}
+// The staging variant preserves cancellation/repeated-click behavior too.
+{
+  const h = harness(false, stagingScript);
+  const started = h.elements.start.handlers.click();
+  h.elements.start.handlers.click();
+  assert.equal(h.calls.length, 1);
+  h.elements.cancel.handlers.click();
+  h.pending.shift().resolve(response({ url: valid.href }));
+  await tick();
+  assert.equal(h.calls[1].url, "/login/cancel");
+  h.pending.shift().resolve(response({ ok: true }));
+  await started;
+  assert.deepEqual(h.navigation, []);
+}
 console.log(
-  "Login UI state checks passed: duplicate clicks, cancellation, Back, failure and stale account responses.",
+  "Login UI checks passed: duplicate clicks, cancellation, Back, failure, stale account responses, and pinned staging redirect isolation.",
 );

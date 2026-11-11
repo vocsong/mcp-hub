@@ -149,6 +149,35 @@ describe("tenant execution", () => {
       ),
     ).toBe(before);
   });
+  it("schedules physical audio cleanup at the nearest expiry", async () => {
+    const { stub, name } = await fresh();
+    const req = input();
+    await stub.speech(name, req);
+    await stub.approve(req.requestId, req);
+    await stub.speech(name, req);
+    const expires = Date.now() + 60000;
+    await runInDurableObject(stub, async (_, state) => {
+      const row = state.storage.sql
+        .exec<{ value: string }>(
+          "SELECT value FROM kv WHERE key=?",
+          "job:" + req.requestId,
+        )
+        .one();
+      const job = JSON.parse(row.value);
+      job.audioExpires = expires;
+      state.storage.sql.exec(
+        "UPDATE kv SET value=? WHERE key=?",
+        JSON.stringify(job),
+        "job:" + req.requestId,
+      );
+    });
+    await stub.speech(name, input());
+    expect(
+      await runInDurableObject(stub, async (_, state) =>
+        state.storage.getAlarm(),
+      ),
+    ).toBeLessThanOrEqual(expires);
+  });
   it("fails expired approvals", async () => {
     const { stub, name } = await fresh(),
       req = input();
