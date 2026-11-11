@@ -10,7 +10,9 @@ now contains a default-disabled capability phase; see [CAPABILITY-TRIAL.md](CAPA
 for its explicit grants, five-minute mutation/client freshness, local revocation
 and remaining activation gates. [MCP-OAUTH.md](MCP-OAUTH.md) describes the separate,
 disabled MCP OAuth server that consumes these product sessions. Vocs Login itself
-is still an identity handoff, not the MCP OAuth issuer. The identity-only statements below describe the
+is still an identity handoff, not the MCP OAuth issuer. The separately deployed
+models-only stage now uses its own exact staging identity profile and callback;
+see [STAGING.md](STAGING.md). The identity-only statements below describe the
 current live wrapper, not an authorization to activate that backend.
 
 ## What is ready

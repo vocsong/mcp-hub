@@ -1,4 +1,4 @@
-# MCP OAuth trial: implemented, disabled, not deployed
+# MCP OAuth trial and isolated staging
 
 ## Scope and evidence
 
@@ -9,9 +9,11 @@ token cryptography. The actual MCP TypeScript SDK exercises discovery through
 authenticated tool calls in the local Cloudflare runtime.
 
 That is protocol integration evidence, **not a successful connection from actual
-Dots or Vocs Code**. Neither client was configured, no live credential was entered,
-no paid provider request ran, and no deployment or infrastructure mutation occurred.
-The existing identity-only public preview and its configuration remain unchanged.
+Dots or Vocs Code**. The full capability backend remains disabled. A subsequent
+[isolated models-only staging phase](STAGING.md) created separate D1/KV and deployed
+a restricted entry, with live anonymous HTTPS checks passing. Authenticated
+verification is pending secure user sign-in. No provider key or paid request was
+used. The production identity-only preview remains unchanged.
 
 ## Protocol contract
 
@@ -57,6 +59,10 @@ secret, software statement or JWKS. A D1-primary counter limits registration to
 renew it after half its lifetime, so this is not an absolute registration lifetime.
 These controls are not a substitute for edge abuse protection, and a malicious
 caller can exhaust the shared allowance. DCR is not advertised when disabled.
+
+Production and staging use finite, exact origin/issuer/client profiles. Staging
+sessions cannot authorize production, or vice versa, even if storage is mistakenly
+shared in a local test. The deployed databases are also physically separate.
 
 Vocs Login remains a separate first-party identity handoff, not an OIDC or MCP
 OAuth issuer. OAuth grants require an active product session and explicit operator
@@ -139,11 +145,12 @@ logged.
 The implementation requires all of: `APP_MODE=production`,
 `PRODUCT_LOGIN_ENABLED=true`, `CAPABILITY_AUTH_ENABLED=true`, `OAUTH_ENABLED=true`,
 canonical HTTPS origin, a separate product `LOGIN_DB` with migrations 0001–0003,
-and a dedicated `OAUTH_KV` binding. All checked-in capability/OAuth flags remain
-false. No live KV namespace or binding has been created. Do not deploy the private
-backend over the existing identity-only mock.
+and a dedicated `OAUTH_KV` binding. Default configurations keep capability/OAuth
+flags false. Only the dedicated `wrangler.staging.live.jsonc` activates the
+models-only staging entry with isolated D1/KV; it cannot execute paid capabilities.
+Do not deploy the private backend over the existing identity-only mock.
 
-Before an independently approved staging activation:
+Before broader capability activation, beyond the deployed models-only staging:
 
 1. Complete a genuine GitHub → Vocs Login → MCP Hub login in a controlled HTTPS
    browser with two authorized accounts. Verify isolation, cancellation, account
@@ -152,7 +159,8 @@ Before an independently approved staging activation:
    or authorized two-account test fixtures were available, so this gate is open.
 2. Review the five-minute residual upstream revocation window, short-grant UX,
    login restart behavior and missing HSTS observed on `mcp.vocs.io` responses.
-   The identity service did return HSTS. No header change was deployed.
+   The identity service did return HSTS. Production headers remain unchanged;
+   the isolated staging entry now sets HSTS.
 3. Review exact grants, new D1 migration/KV binding, cron, metadata fetching, client
    registration limits, private storage, encryption secret provisioning and logs.
 4. Verify actual Dots and Vocs Code discovery/consent, requested scopes, CIMD or

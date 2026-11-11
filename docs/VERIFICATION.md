@@ -76,3 +76,20 @@ The user-created GitHub repository `vocsong/mcp-hub` is public. Initial upload w
   No live migration, KV provisioning, credential entry, paid request or deployment
   occurred. See MCP-OAUTH.md for exact release gates, residual upstream revocation
   and operational logging limitations.
+
+## Isolated models-only staging — 2026-11-11
+
+- 123 tests and both UI fixtures pass. Added exact production/staging realm
+  separation and 21 staging tests; production UI remains unchanged.
+- Independent source/configuration review found no blocking isolation issue. The
+  staging bundle contains no Tenant/provider execution, R2 access or key encryption.
+- Deployed only the separate models-only staging Worker after provisioning dedicated
+  D1/KV and registering its public callback in the existing staging identity service.
+  No production binding, registration, deployment or session was changed.
+- Live HTTPS health, discovery, login pages, pinned script, HSTS, MCP challenge and
+  forbidden key/speech/audio/origin checks pass. Remote bindings and production's
+  original version were verified through the Cloudflare API.
+- Secure GitHub sign-in for the one authorized existing staging identity is pending.
+  Product sessions/grants remain empty; no account permission was fabricated.
+  Actual authenticated model calls, Dots/Vocs Code, a second real account and
+  cross-region revocation are not yet verified. See STAGING.md for the exact record.

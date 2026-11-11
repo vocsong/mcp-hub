@@ -1,10 +1,14 @@
+import {
+  selectLoginProfile,
+  capabilityScopes,
+  type LoginProfile,
+} from "./login/profile";
 /** Disabled-by-default product authorization and manual client credentials.
  * Not OAuth discovery or evidence of Dots/Vocs Code interoperability.
  */
 import {
   hashLoginToken,
   readLoginSession,
-  VOCS_ISSUER,
   type LoginEnv,
 } from "./login/worker";
 import { Fault, type Identity } from "./types";
@@ -14,7 +18,6 @@ export interface CapabilityEnv extends LoginEnv {
   CAPABILITY_AUTH_ENABLED?: string;
 }
 const MAX_AGE = 300_000;
-const allowed = ["models:read", "speech:write", "audio:read"];
 const tokenPattern = /^vmcp_[A-Za-z0-9_-]{43}$/;
 const idPattern = /^[a-f0-9-]{36}$/;
 const headers = {
@@ -35,18 +38,12 @@ export function capabilityAuthEnabled(env: CapabilityEnv): boolean {
 function configured(
   req: Request,
   env: CapabilityEnv,
-): { db: D1DatabaseSession; origin: string } {
+): { db: D1DatabaseSession; origin: string; profile: LoginProfile } {
   if (!capabilityAuthEnabled(env) || !env.LOGIN_DB)
     throw new Fault("capability_auth_not_enabled", 503);
-  let origin: string;
-  try {
-    const url = new URL(env.PUBLIC_ORIGIN || "");
-    if (url.protocol !== "https:" || url.origin !== env.PUBLIC_ORIGIN)
-      throw Error();
-    origin = url.origin;
-  } catch {
-    throw new Fault("capability_auth_not_enabled", 503);
-  }
+  const profile = selectLoginProfile(env);
+  if (!profile) throw new Fault("capability_auth_not_enabled", 503);
+  const origin = profile.origin;
   if (new URL(req.url).origin !== origin) throw new Fault("invalid_host", 403);
   if (
     (req.headers.has("Origin") && req.headers.get("Origin") !== origin) ||
@@ -54,7 +51,7 @@ function configured(
   )
     throw new Fault("invalid_origin", 403);
   // Always primary: a fresh request must observe logout/suspension/grant removal.
-  return { db: env.LOGIN_DB.withSession("first-primary"), origin };
+  return { db: env.LOGIN_DB.withSession("first-primary"), origin, profile };
 }
 async function browser(req: Request, env: CapabilityEnv) {
   const context = configured(req, env);
@@ -63,7 +60,7 @@ async function browser(req: Request, env: CapabilityEnv) {
     req.headers.has("Cf-Access-Jwt-Assertion")
   )
     throw new Fault("invalid_identity", 401);
-  const session = await readLoginSession(req, context.db);
+  const session = await readLoginSession(req, context.db, env);
   if (!session) throw new Fault("authentication_required", 401);
   const permissions = await context.db
     .prepare(
@@ -90,7 +87,8 @@ export async function readProductIdentity(
     return null;
   const path = new URL(req.url).pathname;
   if (path === "/openrouter") throw new Fault("authentication_required", 401);
-  const { session, grants } = await browser(req, env);
+  const { session, grants, profile } = await browser(req, env);
+  const allowed = capabilityScopes(profile);
   if (
     !["GET", "HEAD"].includes(req.method) &&
     !(
@@ -114,7 +112,8 @@ export async function readClientIdentity(
 ): Promise<Identity | null> {
   const auth = req.headers.get("Authorization");
   if (!auth) return null;
-  const { db, origin } = configured(req, env);
+  const { db, origin, profile } = configured(req, env);
+  const allowed = capabilityScopes(profile);
   const path = new URL(req.url).pathname;
   if (path !== "/openrouter" && !path.startsWith("/audio/"))
     throw new Fault("insufficient_scope", 403);
@@ -143,7 +142,7 @@ export async function readClientIdentity(
     .bind(
       await hashLoginToken(token),
       origin + "/openrouter",
-      VOCS_ISSUER,
+      profile.issuer,
       now,
       now,
       now - MAX_AGE,
@@ -175,7 +174,8 @@ export async function handleClientManagement(
   if (url.pathname !== "/api/clients" && revokeId === null) return null;
   try {
     if (url.search || req.url.length > 2048) throw new Fault("invalid_request");
-    const { db, origin, session } = await browser(req, env);
+    const { db, origin, session, profile } = await browser(req, env);
+    const allowed = capabilityScopes(profile);
     if (req.method === "GET" && url.pathname === "/api/clients") {
       const rows = await db
         .prepare(
@@ -262,7 +262,7 @@ export async function handleClientManagement(
         `INSERT INTO hub_client_token(id, token_hash, session_hash, issuer, subject, client_id, scopes, resource, created_at, expires_at)
       SELECT ?, ?, s.token_hash, s.issuer, s.subject, ?, ?, ?, ?, min(?, s.expires_at, s.authenticated_at + ?)
       FROM hub_login_session s JOIN hub_login_principal p ON p.issuer = s.issuer AND p.subject = s.subject
-      WHERE s.token_hash = ? AND s.expires_at > ? AND s.authenticated_at > ? AND s.authenticated_at <= ? AND p.disabled_at IS NULL
+      WHERE s.token_hash = ? AND s.issuer = ? AND s.subject = ? AND s.expires_at > ? AND s.authenticated_at > ? AND s.authenticated_at <= ? AND p.disabled_at IS NULL
       AND EXISTS (SELECT 1 FROM hub_login_permission g WHERE g.issuer = s.issuer AND g.subject = s.subject AND g.permission = 'dashboard:manage')
       AND NOT EXISTS (SELECT 1 FROM json_each(?) x WHERE NOT EXISTS (SELECT 1 FROM hub_login_permission g WHERE g.issuer = s.issuer AND g.subject = s.subject AND g.permission = x.value))
       AND (SELECT COUNT(*) FROM hub_client_token t WHERE t.issuer = s.issuer AND t.subject = s.subject AND t.expires_at > ? AND t.revoked_at IS NULL) < 20
@@ -278,6 +278,8 @@ export async function handleClientManagement(
         expiresAt,
         MAX_AGE,
         session.token_hash,
+        profile.issuer,
+        session.subject,
         now,
         now - MAX_AGE,
         now + 5000,

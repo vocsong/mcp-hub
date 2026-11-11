@@ -4,7 +4,9 @@
 
 This phase is source and local-test work only. No deployment, capability grant,
 new live credential, paid request or Dots/Vocs Code connection was performed.
-The existing identity-only preview and its bindings remain unchanged. The public
+A later isolated models-only staging activation is recorded in [STAGING.md](STAGING.md);
+it does not activate this full capability backend or paid provider path.
+The existing production identity-only preview and its bindings remain unchanged. The public
 mock uses a frozen template, not the private capability dashboard.
 
 Read-only Cloudflare verification on 2026-11-11 found the approved preview version

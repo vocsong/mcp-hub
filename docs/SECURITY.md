@@ -6,7 +6,9 @@
 product-session bridge, scoped client revocation, key lifecycle and narrower
 production trial. [MCP-OAUTH.md](MCP-OAUTH.md) documents the default-disabled
 standards-based OAuth layer and its remaining live verification gates. Its policy supersedes the general local-preview budget/retention
-below when APP_MODE=production. No new capability has been deployed.
+below when APP_MODE=production. The full capability backend is not deployed.
+A physically separate models-only staging entry is active; see [STAGING.md](STAGING.md)
+for its limited routes, identity profile, resources and verification limits.
 
 ## Trust boundaries
 

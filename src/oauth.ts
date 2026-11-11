@@ -1,3 +1,4 @@
+import { selectLoginProfile, capabilityScopes } from "./login/profile";
 /** Disabled-by-default OAuth trial. Protocol cryptography/lifecycle belongs to the official library.
  * D1 guards add primary-consistent source-session, consent and redemption/revocation checks.
  */
@@ -12,7 +13,6 @@ import {
 import {
   readLoginSession,
   hashLoginToken,
-  VOCS_ISSUER,
   type LoginEnv,
 } from "./login/worker";
 import { boundedBody, digest } from "./security";
@@ -24,7 +24,6 @@ export interface OAuthEnv extends LoginEnv {
   OAUTH_DCR_ENABLED?: string;
   OAUTH_KV?: KVNamespace;
 }
-const allowed = ["models:read", "speech:write", "audio:read"];
 const age = 300_000;
 const safeHeaders = {
   "Cache-Control": "no-store",
@@ -57,7 +56,7 @@ function originCheck(req: Request, origin: string) {
   )
     throw new Fault("invalid_origin", 403);
 }
-function scopeCheck(auth: AuthRequest, resource: string) {
+function scopeCheck(auth: AuthRequest, resource: string, allowed: string[]) {
   if (
     auth.codeChallengeMethod !== "S256" ||
     !auth.codeChallenge ||
@@ -103,7 +102,10 @@ export async function handleOAuth(
     path.startsWith("/openrouter/");
   if (!owns || !oauthEnabled(env)) return null;
   try {
-    const origin = env.PUBLIC_ORIGIN || "";
+    const profile = selectLoginProfile(env);
+    if (!profile) throw new Fault("oauth_not_configured", 503);
+    const origin = profile.origin;
+    const allowed = capabilityScopes(profile);
     if (
       !env.LOGIN_DB ||
       !env.OAUTH_KV ||
@@ -186,7 +188,7 @@ export async function handleOAuth(
             o.props.bridgeId,
             o.clientId,
             resource,
-            VOCS_ISSUER,
+            profile.issuer,
             now + 60000,
             now + 60000,
             now - age + 60000,
@@ -196,7 +198,9 @@ export async function handleOAuth(
         if (
           !row ||
           (await digest(row.issuer + "\0" + row.subject)) !== o.userId ||
-          o.requestedScope.some((s) => !JSON.parse(row.scopes).includes(s))
+          o.requestedScope.some(
+            (s) => !allowed.includes(s) || !JSON.parse(row.scopes).includes(s),
+          )
         )
           throw new OAuthError("invalid_grant", {
             description: "Grant is unavailable",
@@ -243,7 +247,7 @@ export async function handleOAuth(
             token.props.bridgeId,
             token.clientId,
             r,
-            VOCS_ISSUER,
+            profile.issuer,
             now,
             now,
             now - age,
@@ -253,7 +257,9 @@ export async function handleOAuth(
         if (
           !row ||
           token.userId !== (await digest(row.issuer + "\0" + row.subject)) ||
-          token.scope.some((s) => !JSON.parse(row.scopes).includes(s))
+          token.scope.some(
+            (s) => !allowed.includes(s) || !JSON.parse(row.scopes).includes(s),
+          )
         )
           return null;
         return {
@@ -312,7 +318,7 @@ export async function handleOAuth(
       )
         throw new Fault("invalid_identity", 401);
       if (req.method !== "GET") originCheck(req, origin);
-      const session = await readLoginSession(req, db);
+      const session = await readLoginSession(req, db, env);
       if (!session)
         return new Response(
           '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in</title><p><a href="/login">Sign in</a>, then restart authorization from your client.</p>',
@@ -379,7 +385,7 @@ export async function handleOAuth(
       ).results.map((x) => x.permission);
       if (req.method === "GET") {
         const auth = await api.parseAuthRequest(req);
-        scopeCheck(auth, resource);
+        scopeCheck(auth, resource, allowed);
         if (auth.scope.some((s) => !grants.includes(s)))
           throw new Fault("invalid_scope", 403);
         const description = await api.describeConsent(auth);
@@ -420,7 +426,7 @@ export async function handleOAuth(
           "default-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
         );
         return new Response(
-          `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Authorize Vocs MCP</title><h1>Authorize ${esc(description.clientName)}</h1><p>${description.clientDomain ? "Verified client domain: " + esc(description.clientDomain) : "Client name is self-asserted and unverified."}</p><p>Redirect destination: ${esc(description.redirectHost)}</p><p>${esc(description.redirectUri)}</p>${description.redirectIsLoopback ? "<p>Any local process could be listening at this loopback address.</p>" : ""}<p>Resource: ${esc(resource)}</p><p>Access ends within five minutes of source sign-in. No dashboard access or refresh token. Speech still requires your separate exact-text approval; this consent does not execute a provider request.</p><form method="post" action="/oauth/authorize"><input type="hidden" name="handle" value="${esc(transaction.handle)}">${auth.scope.map((s) => `<label><input type="checkbox" name="scope" value="${esc(s)}" checked>${esc(s)}</label><br>`).join("")}<button name="decision" value="approve">Approve selected scopes</button><button name="decision" value="deny">Deny</button></form>`,
+          `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Authorize Vocs MCP</title><h1>Authorize ${esc(description.clientName)}</h1><p>${description.clientDomain ? "Verified client domain: " + esc(description.clientDomain) : "Client name is self-asserted and unverified."}</p><p>Redirect destination: ${esc(description.redirectHost)}</p><p>${esc(description.redirectUri)}</p>${description.redirectIsLoopback ? "<p>Any local process could be listening at this loopback address.</p>" : ""}<p>Resource: ${esc(resource)}</p><p>Access ends within five minutes of source sign-in. No dashboard access or refresh token. ${profile.name === "staging" ? "This staging service lists models only. It cannot execute speech, paid requests or audio operations." : "Speech still requires your separate exact-text approval; this consent does not execute a provider request."}</p><form method="post" action="/oauth/authorize"><input type="hidden" name="handle" value="${esc(transaction.handle)}">${auth.scope.map((s) => `<label><input type="checkbox" name="scope" value="${esc(s)}" checked>${esc(s)}</label><br>`).join("")}<button name="decision" value="approve">Approve selected scopes</button><button name="decision" value="deny">Deny</button></form>`,
           { headers: h },
         );
       }
@@ -465,7 +471,7 @@ export async function handleOAuth(
       const approved = await api.approveConsent(req, handle, {
         scope: selected,
       });
-      scopeCheck(approved.request, resource);
+      scopeCheck(approved.request, resource, allowed);
       const id = crypto.randomUUID();
       // Atomically require the exact source session, current principal and every selected grant.
       const inserted = await db
@@ -560,9 +566,15 @@ export async function handleOAuth(
           ) {
             await db
               .prepare(
-                "UPDATE hub_oauth_grant SET revoked_at=? WHERE id=? AND client_id=?",
+                "UPDATE hub_oauth_grant SET revoked_at=? WHERE id=? AND client_id=? AND issuer=? AND resource=?",
               )
-              .bind(Date.now(), token.grant_id, token.client_id)
+              .bind(
+                Date.now(),
+                token.grant_id,
+                token.client_id,
+                profile.issuer,
+                resource,
+              )
               .run();
           }
           const h = new Headers(response.headers);
@@ -583,12 +595,14 @@ export async function handleOAuth(
       const saved = await db
         .prepare(
           `INSERT INTO hub_oauth_token(token_hash,grant_id,client_id)
-        SELECT ?,id,client_id FROM hub_oauth_grant WHERE id=? AND client_id=? AND exchanged=1 AND revoked_at IS NULL AND expires_at>? AND ${current} RETURNING token_hash`,
+        SELECT ?,id,client_id FROM hub_oauth_grant WHERE id=? AND client_id=? AND issuer=? AND resource=? AND exchanged=1 AND revoked_at IS NULL AND expires_at>? AND ${current} RETURNING token_hash`,
         )
         .bind(
           await hashLoginToken(body.access_token),
           issuing.id,
           issuing.clientId,
+          profile.issuer,
+          resource,
           now,
           now,
           now - age,

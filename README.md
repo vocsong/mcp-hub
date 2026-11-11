@@ -1,6 +1,6 @@
 # Vocs MCP Hub
 
-An invite-only Cloudflare MCP hub in development. A browser-only mock is live at `https://mcp.vocs.io`, with identity-only account login available for an invited live test at `https://mcp.vocs.io/login`. The private capability backend and live OpenRouter calls remain disabled.
+An invite-only Cloudflare MCP hub in development. A browser-only mock is live at `https://mcp.vocs.io`, with identity-only account login available for an invited live test at `https://mcp.vocs.io/login`. The private capability backend and live OpenRouter calls remain disabled. A separate [models-only staging service](https://vocs-mcp-staging.vocs.workers.dev) is active for controlled OAuth verification, with no keys, audio or paid execution.
 
 ## Honest MVP status
 
@@ -13,12 +13,17 @@ Standards-based MCP OAuth authorization/discovery is implemented behind disabled
 The next phase adds an explicit account authorization bridge, consent-based BYO
 OpenRouter key management, short-lived OAuth client grants, and a
 one-request production trial with a $0.10 reservation, required approval, 300-byte
-text and one-hour private audio. It remains off and is not deployed. Read the
+text and one-hour private audio. The full capability backend remains off and is not deployed. Read the
 [security contract, local verification and release gates](docs/CAPABILITY-TRIAL.md).
 The [OAuth flow, protocol verification and remaining client gates](docs/MCP-OAUTH.md)
 cover discovery, authorization code + S256 PKCE, consent, scope and revocation.
 The older manual-token trial remains a separate fallback when OAuth is off; neither
-path is deployed or verified in actual Dots/Vocs Code.
+full-capability path is deployed or verified in actual Dots/Vocs Code.
+
+The [isolated staging record](docs/STAGING.md) describes the deployed models-only
+entry, verified anonymous HTTPS boundaries and pending authenticated/client tests.
+Its dedicated live config has only new staging D1/KV bindings and uses a separate
+allowlisted Vocs Login staging issuer/client. Production stays unchanged.
 
 ## Shared Vocs Login integration
 

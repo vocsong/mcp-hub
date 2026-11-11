@@ -257,6 +257,9 @@ export default {
     ctx?: ExecutionContext,
   ): Promise<Response> {
     try {
+      // Staging must use the separate entry with no tenant/provider execution paths.
+      if (env.LOGIN_PROFILE === "staging")
+        throw new Fault("staging_entry_required", 503);
       const login = await handleLogin(req, env);
       if (login) return login;
       if (env.OAUTH_ENABLED === "true") {
