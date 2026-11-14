@@ -7,10 +7,11 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { handleLogin, cleanupLogin } from "./login/worker";
 import { selectLoginProfile, STAGING_LOGIN } from "./login/profile";
 import { handleOAuth, cleanupOAuth, type OAuthEnv } from "./oauth";
+import type { NativeCatalogEnv } from "./native-catalog";
 import { handleAccountCatalog } from "./authorization";
 import { boundedBody } from "./security";
 import { Fault, MODEL, type Identity } from "./types";
-export interface StagingEnv extends OAuthEnv {
+export interface StagingEnv extends OAuthEnv, NativeCatalogEnv {
   STAGING_ENABLED?: string;
   LIVE_PROVIDER?: string;
 }

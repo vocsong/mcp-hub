@@ -1,4 +1,8 @@
 import {
+  readNativeCatalogPrincipal,
+  type NativeCatalogEnv,
+} from "./native-catalog";
+import {
   selectLoginProfile,
   capabilityScopes,
   type LoginProfile,
@@ -13,7 +17,7 @@ import {
 } from "./login/worker";
 import { Fault, type Identity } from "./types";
 import { boundedBody, digest } from "./security";
-export interface CapabilityEnv extends LoginEnv {
+export interface CapabilityEnv extends LoginEnv, NativeCatalogEnv {
   APP_MODE?: string;
   CAPABILITY_AUTH_ENABLED?: string;
   OAUTH_ENABLED?: string;
@@ -75,8 +79,8 @@ async function browser(req: Request, env: CapabilityEnv) {
     throw new Fault("insufficient_scope", 403);
   return { ...context, session, grants };
 }
-/** Read-only account discovery. This browser endpoint is not a desktop token
- * exchange: native apps must not copy the product cookie to call it. Every
+/** Read-only account discovery with separate browser and opt-in native bearer
+ * authentication. Never a token exchange; native apps must not copy cookies. Every
  * snapshot is rebuilt from primary storage, so it cannot resurrect removed grants.
  */
 export async function handleAccountCatalog(
@@ -88,7 +92,32 @@ export async function handleAccountCatalog(
   try {
     if (req.method !== "GET") throw new Fault("method_not_allowed", 405);
     if (url.search || req.url.length > 2048) throw new Fault("invalid_request");
-    const { session, grants, profile } = await browser(req, env);
+    let context: {
+      session: { issuer: string; subject: string };
+      grants: string[];
+      profile: LoginProfile;
+    };
+    if (req.headers.has("Authorization")) {
+      const base = configured(req, env);
+      const principal = await readNativeCatalogPrincipal(req, env);
+      const rows = await base.db
+        .prepare(
+          `SELECT g.permission FROM hub_login_permission g
+        JOIN hub_login_principal p ON p.issuer = g.issuer AND p.subject = g.subject
+        WHERE g.issuer = ? AND g.subject = ? AND p.disabled_at IS NULL`,
+        )
+        .bind(principal.issuer, principal.subject)
+        .all<{ permission: string }>();
+      const grants = rows.results.map((row) => row.permission);
+      if (!grants.includes("dashboard:manage"))
+        throw new Fault("insufficient_scope", 403);
+      context = {
+        ...base,
+        grants,
+        session: principal,
+      };
+    } else context = await browser(req, env);
+    const { session, grants, profile } = context;
     const scopes = capabilityScopes(profile).filter((scope) =>
       grants.includes(scope),
     );
@@ -122,10 +151,16 @@ export async function handleAccountCatalog(
       },
     });
   } catch (error) {
-    return json(
+    const response = json(
       { error: error instanceof Fault ? error.code : "request_failed" },
       error instanceof Fault ? error.status : 500,
     );
+    if (response.status === 401 && env.NATIVE_CATALOG_ENABLED === "true")
+      response.headers.set(
+        "WWW-Authenticate",
+        'Bearer realm="vocs-catalog", error="invalid_token"',
+      );
+    return response;
   }
 }
 /** Null means this credential kind is absent/disabled. Callers must not fall back after Fault. */
