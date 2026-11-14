@@ -7,7 +7,9 @@ async function get(path, init = {}) {
   const response = await fetch(hub + path, {
     ...init,
     redirect: "manual",
-    signal: AbortSignal.timeout(10000),
+    signal: AbortSignal.timeout(20000),
+  }).catch((error) => {
+    throw new Error(`${path}: ${error.name}`, { cause: error });
   });
   assert.equal(
     response.headers.get("cache-control"),
