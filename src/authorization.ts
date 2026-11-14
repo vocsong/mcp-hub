@@ -16,6 +16,8 @@ import { boundedBody, digest } from "./security";
 export interface CapabilityEnv extends LoginEnv {
   APP_MODE?: string;
   CAPABILITY_AUTH_ENABLED?: string;
+  OAUTH_ENABLED?: string;
+  OAUTH_KV?: KVNamespace;
 }
 const MAX_AGE = 300_000;
 const tokenPattern = /^vmcp_[A-Za-z0-9_-]{43}$/;
@@ -72,6 +74,59 @@ async function browser(req: Request, env: CapabilityEnv) {
   if (!grants.includes("dashboard:manage"))
     throw new Fault("insufficient_scope", 403);
   return { ...context, session, grants };
+}
+/** Read-only account discovery. This browser endpoint is not a desktop token
+ * exchange: native apps must not copy the product cookie to call it. Every
+ * snapshot is rebuilt from primary storage, so it cannot resurrect removed grants.
+ */
+export async function handleAccountCatalog(
+  req: Request,
+  env: CapabilityEnv,
+): Promise<Response | null> {
+  const url = new URL(req.url);
+  if (url.pathname !== "/api/connections") return null;
+  try {
+    if (req.method !== "GET") throw new Fault("method_not_allowed", 405);
+    if (url.search || req.url.length > 2048) throw new Fault("invalid_request");
+    const { session, grants, profile } = await browser(req, env);
+    const scopes = capabilityScopes(profile).filter((scope) =>
+      grants.includes(scope),
+    );
+    const oauthAvailable = env.OAUTH_ENABLED === "true" && !!env.OAUTH_KV;
+    return json({
+      version: 1,
+      account: {
+        // Opaque tenant identifier; not an email or a claim of cross-product unlinkability.
+        id: await digest(session.issuer + "\0" + session.subject),
+        identityIssuer: profile.issuer,
+      },
+      connections: scopes.length
+        ? [
+            {
+              id: "openrouter",
+              name: "OpenRouter",
+              transport: "streamable-http",
+              resource: profile.origin + "/openrouter",
+              authorizationServer: oauthAvailable ? profile.origin : null,
+              accountScopes: scopes,
+              authorization: oauthAvailable ? "oauth_required" : "unavailable",
+              // Catalog visibility is not evidence of a saved key or available provider.
+              executionReadiness: "not_checked",
+            },
+          ]
+        : [],
+      policy: {
+        authorizationRequiredPerResource: true,
+        localServersSynced: false,
+        offlineCloudAccess: false,
+      },
+    });
+  } catch (error) {
+    return json(
+      { error: error instanceof Fault ? error.code : "request_failed" },
+      error instanceof Fault ? error.status : 500,
+    );
+  }
 }
 /** Null means this credential kind is absent/disabled. Callers must not fall back after Fault. */
 export async function readProductIdentity(

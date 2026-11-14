@@ -7,6 +7,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { handleLogin, cleanupLogin } from "./login/worker";
 import { selectLoginProfile, STAGING_LOGIN } from "./login/profile";
 import { handleOAuth, cleanupOAuth, type OAuthEnv } from "./oauth";
+import { handleAccountCatalog } from "./authorization";
 import { boundedBody } from "./security";
 import { Fault, MODEL, type Identity } from "./types";
 export interface StagingEnv extends OAuthEnv {
@@ -130,6 +131,8 @@ export default {
           audio: false,
         });
       if (!enabled) return json({ error: "staging_not_enabled" }, 503);
+      const catalog = await handleAccountCatalog(request, env);
+      if (catalog) return secureResponse(catalog);
       // Explicit route allowlist: there is no fallback to dashboard/manual tokens,
       // tenant operations, a production identity provider, or arbitrary proxies.
       if (path.startsWith("/login") || path === "/account") {

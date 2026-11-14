@@ -652,3 +652,26 @@ describe("models-only staging entry", () => {
     },
   );
 });
+
+it("routes catalog only for its realm and filters execution scopes", async () => {
+  const result = await call("/api/connections", {
+    headers: { cookie: cookieFor(STAGING_LOGIN) },
+  });
+  expect(result.status).toBe(200);
+  const body = (await result.json()) as any;
+  expect(body.account.identityIssuer).toBe(STAGING_LOGIN.issuer);
+  expect(body.connections).toHaveLength(1);
+  expect(body.connections[0]).toMatchObject({
+    resource: STAGING_LOGIN.origin + "/openrouter",
+    authorizationServer: STAGING_LOGIN.origin,
+    accountScopes: ["models:read"],
+    authorization: "oauth_required",
+  });
+  expect(
+    (
+      await call("/api/connections", {
+        headers: { cookie: cookieFor(PRODUCTION_LOGIN) },
+      })
+    ).status,
+  ).toBe(401);
+});
