@@ -16,6 +16,7 @@
     "OAUTH_ENABLED": "true",
     "OAUTH_DCR_ENABLED": "true",
     "LIVE_PROVIDER": "disabled",
+    "NATIVE_CATALOG_ENABLED": "true",
   },
   "d1_databases": [
     {

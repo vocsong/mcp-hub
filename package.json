@@ -23,7 +23,8 @@
     "check:dashboard-ui": "node scripts/check-dashboard-ui.mjs",
     "build:preview:live": "wrangler deploy --dry-run --config wrangler.preview.live.jsonc --outdir dist-preview",
     "build:staging": "wrangler deploy --dry-run --minify --config wrangler.staging.jsonc --outdir dist-staging",
-    "build:staging:live": "wrangler deploy --dry-run --minify --config wrangler.staging.live.jsonc --outdir dist-staging"
+    "build:staging:live": "wrangler deploy --dry-run --minify --config wrangler.staging.live.jsonc --outdir dist-staging",
+    "check:native:staging": "node scripts/check-native-staging.mjs --enabled"
   },
   "keywords": [],
   "author": "",
