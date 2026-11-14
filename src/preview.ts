@@ -1,4 +1,4 @@
-import { css } from "./dashboard";
+import { css } from "./preview-template";
 import { html, previewScript, PREVIEW_VERSION } from "./preview-assets";
 const headers = {
   "Content-Security-Policy":

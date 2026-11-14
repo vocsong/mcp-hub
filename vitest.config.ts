@@ -6,6 +6,7 @@ export default defineConfig({
       wrangler: { configPath: "./wrangler.jsonc", environment: "local" },
       miniflare: {
         d1Databases: ["LOGIN_DB"],
+        kvNamespaces: ["OAUTH_KV"],
         bindings: {
           KEY_ENCRYPTION_KEY: btoa("01234567890123456789012345678901"),
         },

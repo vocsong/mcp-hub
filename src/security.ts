@@ -1,4 +1,5 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
+import { readProductIdentity, readClientIdentity } from "./authorization";
 import { Fault, type Env, type Identity } from "./types";
 export async function digest(text: string) {
   return Array.from(
@@ -24,6 +25,13 @@ export async function identity(req: Request, env: Env): Promise<Identity> {
       scopes: ["speech:write", "audio:read", "models:read"],
       dashboard: !url.pathname.startsWith("/openrouter"),
     };
+  }
+  if (env.CAPABILITY_AUTH_ENABLED === "true") {
+    const who =
+      (await readClientIdentity(req, env)) ??
+      (await readProductIdentity(req, env));
+    if (!who) throw new Fault("authentication_required", 401);
+    return who;
   }
   if (
     env.APP_MODE !== "production" ||

@@ -1,5 +1,14 @@
 import { boundedBody } from "./security";
 import { Fault, MODEL, type Env, type Speech } from "./types";
+export function validateLiveProvider(env: Env): void {
+  const validUntil = Date.parse(env.PRICE_VERIFIED_UNTIL || "");
+  if (
+    !Number.isFinite(validUntil) ||
+    validUntil < Date.now() ||
+    validUntil > Date.now() + 86400000
+  )
+    throw new Fault("price_review_required", 503);
+}
 export async function synthesize(
   input: Speech,
   key: string | undefined,
@@ -34,16 +43,12 @@ export async function synthesize(
   }
   if (env.APP_MODE !== "production" || !key)
     throw new Fault("live_provider_disabled", 503);
-  const validUntil = Date.parse(env.PRICE_VERIFIED_UNTIL || "");
-  if (
-    !Number.isFinite(validUntil) ||
-    validUntil < Date.now() ||
-    validUntil > Date.now() + 86400000
-  )
-    throw new Fault("price_review_required", 503);
+  validateLiveProvider(env);
   const response = await fetch("https://openrouter.ai/api/v1/audio/speech", {
     method: "POST",
-    redirect: "error",
+    // Workers supports manual but not error. Never forward the key on a redirect;
+    // every non-2xx response, including 3xx, is rejected below without a retry.
+    redirect: "manual",
     signal: AbortSignal.timeout(25000),
     headers: {
       Authorization: `Bearer ${key}`,

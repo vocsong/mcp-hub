@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "types": "wrangler types",
     "test": "vitest run",
-    "check": "npm run typecheck && npm test && npm run check:login-ui",
+    "check": "npm run typecheck && npm test && npm run check:login-ui && npm run check:dashboard-ui",
     "build": "wrangler deploy --dry-run --env= --outdir dist",
     "dev:portable": "npm run build && node scripts/local.mjs",
     "format": "prettier --write src test scripts package.json tsconfig.json wrangler.jsonc vitest.config.ts docs README.md",
@@ -20,12 +20,16 @@
     "dev:preview": "npm run build:preview && node scripts/local-preview.mjs",
     "check:preview": "npm run build:preview && node scripts/check-preview.mjs",
     "check:login-ui": "node scripts/check-login-ui.mjs",
-    "build:preview:live": "wrangler deploy --dry-run --config wrangler.preview.live.jsonc --outdir dist-preview"
+    "check:dashboard-ui": "node scripts/check-dashboard-ui.mjs",
+    "build:preview:live": "wrangler deploy --dry-run --config wrangler.preview.live.jsonc --outdir dist-preview",
+    "build:staging": "wrangler deploy --dry-run --minify --config wrangler.staging.jsonc --outdir dist-staging",
+    "build:staging:live": "wrangler deploy --dry-run --minify --config wrangler.staging.live.jsonc --outdir dist-staging"
   },
   "keywords": [],
   "author": "",
   "type": "module",
   "dependencies": {
+    "@cloudflare/workers-oauth-provider": "1.2.4",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "jose": "^6.2.15",
     "zod": "^4.6.7"

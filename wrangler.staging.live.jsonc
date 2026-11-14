@@ -1,0 +1,40 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "vocs-mcp-staging",
+  "main": "src/staging.ts",
+  "compatibility_date": "2026-11-08",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "vars": {
+    "APP_MODE": "production",
+    "STAGING_ENABLED": "true",
+    "LOGIN_PROFILE": "staging",
+    "PUBLIC_ORIGIN": "https://vocs-mcp-staging.vocs.workers.dev",
+    "PRODUCT_LOGIN_ENABLED": "true",
+    "CAPABILITY_AUTH_ENABLED": "true",
+    "OAUTH_ENABLED": "true",
+    "OAUTH_DCR_ENABLED": "true",
+    "LIVE_PROVIDER": "disabled",
+  },
+  "d1_databases": [
+    {
+      "binding": "LOGIN_DB",
+      "database_name": "vocs-mcp-staging-login",
+      "database_id": "3459671a-c587-472c-898a-cd4990ecb8e3",
+      "migrations_dir": "migrations/login",
+    },
+  ],
+  "kv_namespaces": [
+    { "binding": "OAUTH_KV", "id": "77eacdfb748045dcad7f9e90e80d1da8" },
+  ],
+  "triggers": { "crons": ["*/15 * * * *"] },
+  "observability": {
+    "enabled": false,
+    "redact_query_string": true,
+    "logs": { "enabled": false, "invocation_logs": false },
+    "traces": { "enabled": false },
+  },
+  "logpush": false,
+  "tail_consumers": [],
+}

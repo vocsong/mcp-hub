@@ -305,7 +305,10 @@ describe("shared Vocs Login", () => {
     expect(fetch).toHaveBeenCalledTimes(1);
     const [url, init] = vi.mocked(fetch).mock.calls[0];
     expect(url).toBe(VOCS_ISSUER + "/sso/token");
-    expect(init?.redirect).toBe("error");
+    expect(init?.redirect).toBe("manual");
+    // Construct a real workerd Request, not just a mocked fetch init. The
+    // unsupported redirect:error option otherwise passes mocked-fetch tests.
+    expect(new Request(url, init).redirect).toBe("manual");
     expect(init?.method).toBe("POST");
     expect(init?.signal).toBeInstanceOf(AbortSignal);
     expect(new Headers(init?.headers).has("Cookie")).toBe(false);
@@ -320,6 +323,28 @@ describe("shared Vocs Login", () => {
     );
     expect(fetch).toHaveBeenCalledTimes(1);
   });
+  it.each([301, 302, 303, 307, 308])(
+    "rejects identity HTTP %i without forwarding credentials or retrying",
+    async (status) => {
+      const flow = await start();
+      vi.mocked(fetch).mockImplementation(async (input, init) => {
+        expect(new Request(input, init).redirect).toBe("manual");
+        return new Response(null, {
+          status,
+          headers: { Location: "https://untrusted.example/token" },
+        });
+      });
+      expect((await run(callbackRequest(flow))).headers.get("Location")).toBe(
+        "/login/error",
+      );
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(
+        (await db
+          .prepare("SELECT count(*) AS n FROM hub_login_session")
+          .first<{ n: number }>())!.n,
+      ).toBe(0);
+    },
+  );
   it.each([
     { issuer: VOCS_ISSUER + "/" },
     { issuer: "https://evil.test" },

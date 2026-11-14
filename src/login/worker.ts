@@ -1,12 +1,22 @@
 /** First-party Vocs identity handoff. Not OIDC, MCP OAuth, or a capability grant. */
-import { loginHtml, accountHtml, loginScript, loginCss } from "./ui";
-export interface LoginEnv {
+import {
+  loginHtmlForProfile,
+  accountHtmlForProfile,
+  loginScriptForProfile,
+  loginCss,
+} from "./ui";
+import {
+  PRODUCTION_LOGIN,
+  selectLoginProfile,
+  type LoginProfile,
+  type LoginProfileEnv,
+} from "./profile";
+export interface LoginEnv extends LoginProfileEnv {
   PRODUCT_LOGIN_ENABLED?: string;
-  PUBLIC_ORIGIN?: string;
   LOGIN_DB?: D1Database;
 }
-export const VOCS_ISSUER = "https://auth.vocs.io";
-export const PRODUCT_CLIENT = "mcp-hub";
+export const VOCS_ISSUER = PRODUCTION_LOGIN.issuer;
+export const PRODUCT_CLIENT = PRODUCTION_LOGIN.clientId;
 const STATE_COOKIE = "__Host-mcp.login";
 const SESSION_COOKIE = "__Host-mcp.session";
 const FLOW_MS = 5 * 60_000;
@@ -51,22 +61,12 @@ function base64url(value: Uint8Array): string {
     .replace(/=+$/, "");
 }
 const random = () => base64url(crypto.getRandomValues(new Uint8Array(32)));
-async function hash(value: string): Promise<string> {
+export async function hashLoginToken(value: string): Promise<string> {
   return base64url(
     new Uint8Array(
       await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)),
     ),
   );
-}
-function origin(env: LoginEnv): string | null {
-  try {
-    const url = new URL(env.PUBLIC_ORIGIN || "");
-    return url.protocol === "https:" && url.origin === env.PUBLIC_ORIGIN
-      ? url.origin
-      : null;
-  } catch {
-    return null;
-  }
 }
 async function boundedJson(
   body: ReadableStream<Uint8Array> | null,
@@ -109,31 +109,35 @@ function emptyObject(value: unknown): boolean {
     Object.keys(value).length === 0
   );
 }
-interface Session {
+export interface LoginSession {
+  token_hash: string;
   issuer: string;
   subject: string;
   authenticated_at: number;
   expires_at: number;
 }
-async function session(
+export async function readLoginSession(
   request: Request,
-  db: D1Database,
-): Promise<Session | null> {
+  db: D1Database | D1DatabaseSession,
+  env: LoginProfileEnv,
+): Promise<LoginSession | null> {
+  const profile = selectLoginProfile(env);
   const token = readCookie(request, SESSION_COOKIE);
-  if (!token) return null;
+  if (!profile || !token || new URL(request.url).origin !== profile.origin)
+    return null;
   return db
     .prepare(
-      `SELECT s.issuer, s.subject, s.authenticated_at, s.expires_at
+      `SELECT s.token_hash, s.issuer, s.subject, s.authenticated_at, s.expires_at
     FROM hub_login_session s JOIN hub_login_principal p ON p.issuer = s.issuer AND p.subject = s.subject
     WHERE s.token_hash = ? AND s.issuer = ? AND s.expires_at > ? AND p.disabled_at IS NULL`,
     )
-    .bind(await hash(token), VOCS_ISSUER, Date.now())
-    .first<Session>();
+    .bind(await hashLoginToken(token), profile.issuer, Date.now())
+    .first<LoginSession>();
 }
 async function start(
   request: Request,
   db: D1Database,
-  productOrigin: string,
+  profile: LoginProfile,
 ): Promise<Response> {
   // A single bounded, anonymous counter protects database growth. No IP/user-agent storage.
   const window = Math.floor(Date.now() / 60_000);
@@ -153,30 +157,32 @@ async function start(
   const previous = readCookie(request, STATE_COOKIE);
   await db.batch([
     db
-      .prepare("DELETE FROM hub_login_session WHERE browser_hash = ?")
-      .bind(previous ? await hash(previous) : ""),
+      .prepare(
+        "DELETE FROM hub_login_session WHERE browser_hash = ? AND issuer = ?",
+      )
+      .bind(previous ? await hashLoginToken(previous) : "", profile.issuer),
     db
       .prepare(
         "DELETE FROM hub_login_transaction WHERE browser_hash = ? OR expires_at <= ?",
       )
-      .bind(previous ? await hash(previous) : "", Date.now()),
+      .bind(previous ? await hashLoginToken(previous) : "", Date.now()),
     db
       .prepare(
         "INSERT INTO hub_login_transaction(state_hash, browser_hash, verifier, expires_at) VALUES (?, ?, ?, ?)",
       )
       .bind(
-        await hash(state),
-        await hash(browser),
+        await hashLoginToken(state),
+        await hashLoginToken(browser),
         verifier,
         Date.now() + FLOW_MS,
       ),
   ]);
-  const destination = new URL("/authorize", VOCS_ISSUER);
+  const destination = new URL("/authorize", profile.issuer);
   destination.search = new URLSearchParams({
-    client_id: PRODUCT_CLIENT,
-    redirect_uri: productOrigin + "/login/callback",
+    client_id: profile.clientId,
+    redirect_uri: profile.origin + "/login/callback",
     state,
-    code_challenge: await hash(verifier),
+    code_challenge: await hashLoginToken(verifier),
     code_challenge_method: "S256",
   }).toString();
   const result = json({ url: destination.href });
@@ -189,7 +195,7 @@ async function start(
 async function callback(
   request: Request,
   db: D1Database,
-  productOrigin: string,
+  profile: LoginProfile,
 ): Promise<Response> {
   const failed = () => {
     const result = redirect("/login/error");
@@ -206,7 +212,7 @@ async function callback(
       !["code", "state", "iss"].every(
         (key) => params.getAll(key).length === 1,
       ) ||
-      params.get("iss") !== VOCS_ISSUER ||
+      params.get("iss") !== profile.issuer ||
       !TOKEN.test(params.get("code") || "") ||
       !TOKEN.test(params.get("state") || "") ||
       !browser
@@ -217,20 +223,27 @@ async function callback(
       .prepare(
         "UPDATE hub_login_transaction SET claimed = 1 WHERE state_hash = ? AND browser_hash = ? AND expires_at > ? AND claimed = 0 RETURNING verifier",
       )
-      .bind(await hash(params.get("state")!), await hash(browser), Date.now())
+      .bind(
+        await hashLoginToken(params.get("state")!),
+        await hashLoginToken(browser),
+        Date.now(),
+      )
       .first<{ verifier: string }>();
     if (!transaction) return failed();
-    const exchange = await fetch(VOCS_ISSUER + "/sso/token", {
+    const exchange = await fetch(profile.issuer + "/sso/token", {
       method: "POST",
-      redirect: "error",
+      // Workers supports follow/manual, not the browser-only error mode.
+      // Never follow an identity redirect with this one-time code/verifier;
+      // the non-2xx guard below rejects every 3xx response.
+      redirect: "manual",
       signal: AbortSignal.timeout(10_000),
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
       body: JSON.stringify({
-        client_id: PRODUCT_CLIENT,
-        redirect_uri: productOrigin + "/login/callback",
+        client_id: profile.clientId,
+        redirect_uri: profile.origin + "/login/callback",
         code: params.get("code"),
         code_verifier: transaction.verifier,
       }),
@@ -249,8 +262,8 @@ async function callback(
     const value = assertion as Record<string, unknown>;
     if (
       Object.keys(value).length !== 4 ||
-      value.issuer !== VOCS_ISSUER ||
-      value.audience !== PRODUCT_CLIENT ||
+      value.issuer !== profile.issuer ||
+      value.audience !== profile.clientId ||
       typeof value.subject !== "string" ||
       !/^[A-Za-z0-9_-]{1,128}$/.test(value.subject) ||
       typeof value.authenticated_at !== "string"
@@ -276,10 +289,10 @@ async function callback(
           "INSERT INTO hub_login_principal(issuer, subject) SELECT ?, ? WHERE EXISTS (SELECT 1 FROM hub_login_transaction WHERE state_hash = ? AND browser_hash = ? AND claimed = 1 AND expires_at > ?) ON CONFLICT DO NOTHING",
         )
         .bind(
-          VOCS_ISSUER,
+          profile.issuer,
           value.subject,
-          await hash(params.get("state")!),
-          await hash(browser),
+          await hashLoginToken(params.get("state")!),
+          await hashLoginToken(browser),
           Date.now(),
         ),
       db
@@ -289,26 +302,33 @@ async function callback(
         AND EXISTS (SELECT 1 FROM hub_login_transaction WHERE state_hash = ? AND browser_hash = ? AND claimed = 1 AND expires_at > ?)`,
         )
         .bind(
-          await hash(token),
-          await hash(browser),
+          await hashLoginToken(token),
+          await hashLoginToken(browser),
           authenticated,
           expires,
-          VOCS_ISSUER,
+          profile.issuer,
           value.subject,
-          await hash(params.get("state")!),
-          await hash(browser),
+          await hashLoginToken(params.get("state")!),
+          await hashLoginToken(browser),
           Date.now(),
         ),
       db
         .prepare(
           "DELETE FROM hub_login_transaction WHERE state_hash = ? AND browser_hash = ?",
         )
-        .bind(await hash(params.get("state")!), await hash(browser)),
+        .bind(
+          await hashLoginToken(params.get("state")!),
+          await hashLoginToken(browser),
+        ),
       db
         .prepare(
-          "DELETE FROM hub_login_session WHERE token_hash = ? AND EXISTS (SELECT 1 FROM hub_login_session WHERE token_hash = ?)",
+          "DELETE FROM hub_login_session WHERE token_hash = ? AND issuer = ? AND EXISTS (SELECT 1 FROM hub_login_session WHERE token_hash = ?)",
         )
-        .bind(previous ? await hash(previous) : "", await hash(token)),
+        .bind(
+          previous ? await hashLoginToken(previous) : "",
+          profile.issuer,
+          await hashLoginToken(token),
+        ),
     ]);
     if (results[1].meta.changes !== 1) return failed();
     const result = redirect("/account");
@@ -340,9 +360,10 @@ export async function handleLogin(
 ): Promise<Response | null> {
   const url = new URL(request.url);
   if (!paths.has(url.pathname)) return null;
-  const productOrigin = origin(env);
-  if (env.PRODUCT_LOGIN_ENABLED !== "true" || !env.LOGIN_DB || !productOrigin)
+  const profile = selectLoginProfile(env);
+  if (env.PRODUCT_LOGIN_ENABLED !== "true" || !env.LOGIN_DB || !profile)
     return json({ error: "product_login_not_enabled" }, 503);
+  const productOrigin = profile.origin;
   if (url.origin !== productOrigin || request.url.length > 2048)
     return json({ error: "invalid_request" }, 400);
   if (
@@ -355,9 +376,9 @@ export async function handleLogin(
   try {
     if (request.method === "GET") {
       if (url.pathname === "/login/callback")
-        return callback(request, env.LOGIN_DB, productOrigin);
+        return callback(request, env.LOGIN_DB, profile);
       if (url.pathname === "/login/session") {
-        const active = await session(request, env.LOGIN_DB);
+        const active = await readLoginSession(request, env.LOGIN_DB, env);
         return active
           ? json({
               subject: active.subject,
@@ -370,16 +391,16 @@ export async function handleLogin(
       }
       const page =
         url.pathname === "/login" || url.pathname === "/login/error"
-          ? loginHtml(url.pathname === "/login/error")
+          ? loginHtmlForProfile(url.pathname === "/login/error", profile)
           : url.pathname === "/account"
-            ? accountHtml
+            ? accountHtmlForProfile(profile)
             : null;
       if (page)
         return response(page, 200, {
           "Content-Type": "text/html; charset=utf-8",
         });
       if (url.pathname === "/login/ui.js")
-        return response(loginScript, 200, {
+        return response(loginScriptForProfile(profile), 200, {
           "Content-Type": "text/javascript",
         });
       if (url.pathname === "/login/ui.css")
@@ -398,7 +419,7 @@ export async function handleLogin(
       )
         return json({ error: "invalid_request" }, 400);
       if (url.pathname === "/login/start")
-        return start(request, env.LOGIN_DB, productOrigin);
+        return start(request, env.LOGIN_DB, profile);
       const browser = readCookie(request, STATE_COOKIE);
       const token =
         url.pathname === "/login/logout"
@@ -409,12 +430,13 @@ export async function handleLogin(
       await env.LOGIN_DB.batch([
         env.LOGIN_DB.prepare(
           "DELETE FROM hub_login_transaction WHERE browser_hash = ?",
-        ).bind(browser ? await hash(browser) : ""),
+        ).bind(browser ? await hashLoginToken(browser) : ""),
         env.LOGIN_DB.prepare(
-          "DELETE FROM hub_login_session WHERE browser_hash = ? OR token_hash = ?",
+          "DELETE FROM hub_login_session WHERE (browser_hash = ? OR token_hash = ?) AND issuer = ?",
         ).bind(
-          browser ? await hash(browser) : "",
-          token ? await hash(token) : "",
+          browser ? await hashLoginToken(browser) : "",
+          token ? await hashLoginToken(token) : "",
+          profile.issuer,
         ),
       ]);
       const result = json({ ok: true });

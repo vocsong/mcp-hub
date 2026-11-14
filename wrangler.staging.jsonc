@@ -1,0 +1,36 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "vocs-mcp-staging",
+  "main": "src/staging.ts",
+  "compatibility_date": "2026-11-08",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": {
+    "APP_MODE": "disabled",
+    "STAGING_ENABLED": "false",
+    "LOGIN_PROFILE": "staging",
+    "PUBLIC_ORIGIN": "https://vocs-mcp-staging.vocs.workers.dev",
+    "PRODUCT_LOGIN_ENABLED": "false",
+    "CAPABILITY_AUTH_ENABLED": "false",
+    "OAUTH_ENABLED": "false",
+    "OAUTH_DCR_ENABLED": "false",
+    "LIVE_PROVIDER": "disabled",
+  },
+  // Disabled source template. This file does not provision or reference resources.
+  // A separately approved live config must bind newly provisioned staging resources:
+  // d1_databases: [{ binding: LOGIN_DB, database_name: vocs-mcp-staging-login,
+  //   database_id: <NEW_STAGING_D1_ID>, migrations_dir: migrations/login }]
+  // kv_namespaces: [{ binding: OAUTH_KV, id: <NEW_STAGING_OAUTH_KV_ID> }]
+  // No Durable Object is used in the models-only phase. Any later DO namespace
+  // must be newly provisioned for staging, never a production script binding.
+  // No R2, provider key, master encryption secret, routes or scheduled trigger.
+  "observability": {
+    "enabled": false,
+    "redact_query_string": true,
+    "logs": { "enabled": false, "invocation_logs": false },
+    "traces": { "enabled": false },
+  },
+  "logpush": false,
+  "tail_consumers": [],
+}

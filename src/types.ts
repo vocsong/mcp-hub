@@ -6,6 +6,12 @@ export interface Env extends LoginEnv {
   APP_MODE: string;
   PUBLIC_ORIGIN: string;
   LIVE_PROVIDER: string;
+  CAPABILITY_AUTH_ENABLED?: string;
+  OAUTH_ENABLED?: string;
+  NATIVE_CATALOG_ENABLED?: string;
+  NATIVE_CATALOG_CLIENT_SECRET?: string;
+  OAUTH_DCR_ENABLED?: string;
+  OAUTH_KV?: KVNamespace;
   KEY_ENCRYPTION_KEY?: string;
   AUTH_ISSUER?: string;
   AUTH_AUDIENCE?: string;
@@ -22,10 +28,12 @@ export type Speech = {
 export type Job = {
   id: string;
   digest: string;
-  status: "pending" | "approved" | "running" | "complete" | "uncertain";
+  status:
+    "pending" | "approved" | "running" | "complete" | "uncertain" | "cancelled";
   created: number;
   expires: number;
   reserve: number;
+  keyRevision?: number;
   artifact?: string;
   audioExpires?: number;
 };

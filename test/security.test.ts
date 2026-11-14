@@ -80,7 +80,8 @@ it("live provider fails closed without a fresh price review", async () => {
 it("live speech uses only fixed endpoint, model and privacy controls, returning bounded raw audio", async () => {
   vi.mocked(fetch).mockImplementation(async (url, init) => {
     expect(String(url)).toBe("https://openrouter.ai/api/v1/audio/speech");
-    expect(init?.redirect).toBe("error");
+    expect(init?.redirect).toBe("manual");
+    expect(new Request(url, init).redirect).toBe("manual");
     const x = JSON.parse(init?.body as string);
     expect(x.model).toBe("mistralai/voxtral-mini-tts-2603");
     expect(x.provider).toEqual({ zdr: true, data_collection: "deny" });
@@ -98,3 +99,31 @@ it("live speech uses only fixed endpoint, model and privacy controls, returning 
   expect(new TextDecoder().decode(audio.bytes)).toBe("audio");
   expect(fetch).toHaveBeenCalledTimes(1);
 });
+it.each([301, 302, 303, 307, 308])(
+  "rejects provider HTTP %i without forwarding the key or retrying",
+  async (status) => {
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      expect(new Request(input, init).redirect).toBe("manual");
+      return new Response(null, {
+        status,
+        headers: { Location: "https://untrusted.example/speech" },
+      });
+    });
+    await expect(
+      synthesize(
+        {
+          text: "synthetic fixture",
+          voice: "en_paul_neutral",
+          requestId: crypto.randomUUID(),
+        },
+        "test-not-secret",
+        {
+          ...e,
+          LIVE_PROVIDER: "enabled",
+          PRICE_VERIFIED_UNTIL: new Date(Date.now() + 3600000).toISOString(),
+        },
+      ),
+    ).rejects.toThrow("provider_outcome_uncertain");
+    expect(fetch).toHaveBeenCalledTimes(1);
+  },
+);

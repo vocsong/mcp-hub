@@ -2,7 +2,7 @@
  * Public mock-only preview. NO account, storage, provider, tenant or secret bindings.
  * Only static GET/HEAD resources. All interaction runs in browser memory.
  */
-import { dashboard, css } from "./dashboard";
+import { dashboard, css } from "./preview-template";
 export const PREVIEW_VERSION = "neutral-preview-v1";
 export const html = dashboard
   .replace("INVITE-ONLY PREVIEW", "PUBLIC DESIGN PREVIEW")
