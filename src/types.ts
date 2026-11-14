@@ -8,6 +8,8 @@ export interface Env extends LoginEnv {
   LIVE_PROVIDER: string;
   CAPABILITY_AUTH_ENABLED?: string;
   OAUTH_ENABLED?: string;
+  NATIVE_CATALOG_ENABLED?: string;
+  NATIVE_CATALOG_CLIENT_SECRET?: string;
   OAUTH_DCR_ENABLED?: string;
   OAUTH_KV?: KVNamespace;
   KEY_ENCRYPTION_KEY?: string;
