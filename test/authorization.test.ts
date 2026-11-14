@@ -6,6 +6,7 @@ import {
   capabilityAuthEnabled,
   cleanupClients,
   handleClientManagement,
+  handleAccountCatalog,
   readClientIdentity,
   readProductIdentity,
   type CapabilityEnv,
@@ -556,5 +557,97 @@ describe("integrated capability router", () => {
         )
       ).status,
     ).toBe(200);
+  });
+});
+
+describe("account connection catalog", () => {
+  it("returns only current account grants without granting a client access", async () => {
+    await seed("alice", ["dashboard:manage", "models:read"]);
+    await seed("bob", ["dashboard:manage", "audio:read"]);
+    const alice = (await handleAccountCatalog(req("/api/connections"), {
+      ...cfg,
+      OAUTH_ENABLED: "true",
+      OAUTH_KV: (env as unknown as { OAUTH_KV: KVNamespace }).OAUTH_KV,
+    }))!;
+    const a = (await alice.json()) as any;
+    const b = (await (await handleAccountCatalog(
+      req("/api/connections", "bob"),
+      cfg,
+    ))!.json()) as any;
+    expect(alice.headers.get("Cache-Control")).toBe("no-store");
+    expect(a.connections[0]).toMatchObject({
+      accountScopes: ["models:read"],
+      authorization: "oauth_required",
+      executionReadiness: "not_checked",
+    });
+    expect(b.connections[0].accountScopes).toEqual(["audio:read"]);
+    expect(a.account.id).not.toBe(b.account.id);
+    expect(JSON.stringify(a)).not.toContain("alice");
+    expect(a.policy.offlineCloudAccess).toBe(false);
+    expect(b.connections[0].authorization).toBe("unavailable");
+    expect(b.connections[0].authorizationServer).toBeNull();
+    expect(
+      (await db
+        .prepare("SELECT count(*) AS n FROM hub_client_token")
+        .first<{ n: number }>())!.n,
+    ).toBe(0);
+    await db
+      .prepare(
+        "DELETE FROM hub_login_permission WHERE subject = ? AND permission = ?",
+      )
+      .bind("alice", "models:read")
+      .run();
+    expect(
+      (
+        (await (await handleAccountCatalog(
+          req("/api/connections"),
+          cfg,
+        ))!.json()) as any
+      ).connections,
+    ).toEqual([]);
+    await db
+      .prepare(
+        "UPDATE hub_login_principal SET disabled_at = ? WHERE subject = ?",
+      )
+      .bind(Date.now(), "alice")
+      .run();
+    expect(
+      (await handleAccountCatalog(req("/api/connections"), cfg))!.status,
+    ).toBe(401);
+  });
+  it("rejects missing or ambiguous identity, foreign origins, mutations and query overrides", async () => {
+    await seed();
+    for (const request of [
+      new Request(origin + "/api/connections"),
+      req("/api/connections", "alice", undefined, {
+        Authorization: "Bearer vmcp_" + "x".repeat(43),
+      }),
+      req("/api/connections", "alice", undefined, {
+        Origin: "https://evil.example",
+      }),
+      req("/api/connections", "alice", undefined, {
+        "Sec-Fetch-Site": "cross-site",
+      }),
+      req("/api/connections?subject=bob"),
+      req("/api/connections", "alice", {}, {}, "POST"),
+    ])
+      expect(
+        (await handleAccountCatalog(request, cfg))!.status,
+      ).toBeGreaterThanOrEqual(400);
+    expect(
+      (await handleAccountCatalog(req("/api/connections"), {
+        ...cfg,
+        CAPABILITY_AUTH_ENABLED: undefined,
+      }))!.status,
+    ).toBe(503);
+    expect(await handleAccountCatalog(req("/api/status"), cfg)).toBeNull();
+  });
+  it("is routed by the worker before any tenant or provider access", async () => {
+    await seed();
+    const result = await worker.fetch(req("/api/connections"), cfg as Env);
+    expect(result.status).toBe(200);
+    expect(((await result.json()) as any).connections[0].resource).toBe(
+      origin + "/openrouter",
+    );
   });
 });

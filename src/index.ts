@@ -2,6 +2,7 @@ import { handleOAuth, cleanupOAuth, oauthEnabled } from "./oauth";
 import { handleLogin, cleanupLogin } from "./login/worker";
 import {
   handleClientManagement,
+  handleAccountCatalog,
   cleanupClients,
   capabilityAuthEnabled,
 } from "./authorization";
@@ -275,6 +276,8 @@ export default {
         new URL(req.url).pathname === "/api/clients"
       )
         throw new Fault("oauth_connection_required", 403);
+      const catalog = await handleAccountCatalog(req, env);
+      if (catalog) return catalog;
       const client = await handleClientManagement(req, env);
       if (client) return client;
       const who = await identity(req, env);
