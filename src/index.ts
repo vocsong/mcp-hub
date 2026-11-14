@@ -263,6 +263,8 @@ export default {
         throw new Fault("staging_entry_required", 503);
       const login = await handleLogin(req, env);
       if (login) return login;
+      const catalog = await handleAccountCatalog(req, env);
+      if (catalog) return catalog;
       if (env.OAUTH_ENABLED === "true") {
         if (!ctx) throw new Fault("oauth_context_required", 503);
         const oauth = await handleOAuth(req, env, ctx, (who) =>
@@ -276,8 +278,6 @@ export default {
         new URL(req.url).pathname === "/api/clients"
       )
         throw new Fault("oauth_connection_required", 403);
-      const catalog = await handleAccountCatalog(req, env);
-      if (catalog) return catalog;
       const client = await handleClientManagement(req, env);
       if (client) return client;
       const who = await identity(req, env);

@@ -98,3 +98,10 @@ release gate, including operator-disable handling, session revocation, explicit
 client provisioning, cancellation, two real accounts and desktop account
 switching. Do not enable it before those checks. It does not broaden existing
 OpenRouter OAuth grants or turn local tools into cloud capabilities.
+
+Native resource discovery is at
+`/.well-known/oauth-protected-resource/api/connections`, distinct from the
+OpenRouter resource. It is exposed only when native catalog authorization is
+configured. Native 401 responses point to this metadata via `WWW-Authenticate`.
+The catalog audience advertises only the pinned identity issuer and
+`catalog:read`, never OpenRouter execution scopes.

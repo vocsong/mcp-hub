@@ -88,10 +88,26 @@ export async function handleAccountCatalog(
   env: CapabilityEnv,
 ): Promise<Response | null> {
   const url = new URL(req.url);
-  if (url.pathname !== "/api/connections") return null;
+  const metadataPath = "/.well-known/oauth-protected-resource/api/connections";
+  if (url.pathname !== "/api/connections" && url.pathname !== metadataPath)
+    return null;
   try {
     if (req.method !== "GET") throw new Fault("method_not_allowed", 405);
     if (url.search || req.url.length > 2048) throw new Fault("invalid_request");
+    if (url.pathname === metadataPath) {
+      const { profile } = configured(req, env);
+      if (
+        env.NATIVE_CATALOG_ENABLED !== "true" ||
+        !env.NATIVE_CATALOG_CLIENT_SECRET
+      )
+        throw new Fault("native_catalog_not_enabled", 503);
+      return json({
+        resource: profile.origin + "/api/connections",
+        authorization_servers: [profile.issuer + "/api/auth"],
+        scopes_supported: ["catalog:read"],
+        bearer_methods_supported: ["header"],
+      });
+    }
     let context: {
       session: { issuer: string; subject: string };
       grants: string[];
@@ -158,7 +174,7 @@ export async function handleAccountCatalog(
     if (response.status === 401 && env.NATIVE_CATALOG_ENABLED === "true")
       response.headers.set(
         "WWW-Authenticate",
-        'Bearer realm="vocs-catalog", error="invalid_token"',
+        `Bearer realm="vocs-catalog", error="invalid_token", resource_metadata="${selectLoginProfile(env)!.origin}${metadataPath}"`,
       );
     return response;
   }

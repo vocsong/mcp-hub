@@ -6,6 +6,8 @@ import {
   type NativeCatalogEnv,
 } from "../src/native-catalog";
 import { handleAccountCatalog, type CapabilityEnv } from "../src/authorization";
+import worker from "../src/index";
+import type { Env } from "../src/types";
 import loginSchema from "../migrations/login/0001_product_sessions.sql?raw";
 const origin = "https://mcp.vocs.io";
 const issuer = "https://auth.vocs.io/api/auth";
@@ -86,6 +88,39 @@ async function fixture(overrides: Record<string, unknown> = {}) {
   };
 }
 describe("native catalog resource boundary", () => {
+  it("advertises only the pinned native catalog resource before the legacy MCP metadata router", async () => {
+    const url =
+      origin + "/.well-known/oauth-protected-resource/api/connections";
+    const response = await worker.fetch(new Request(url), {
+      ...cfg,
+      OAUTH_ENABLED: "true",
+    } as Env);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      resource,
+      authorization_servers: [issuer],
+      scopes_supported: ["catalog:read"],
+      bearer_methods_supported: ["header"],
+    });
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(
+      (
+        await worker.fetch(new Request(url), {
+          ...cfg,
+          NATIVE_CATALOG_ENABLED: undefined,
+        } as Env)
+      ).status,
+    ).toBe(503);
+    expect(
+      (
+        await worker.fetch(
+          new Request(url + "?resource=https://evil.example"),
+          cfg as Env,
+        )
+      ).status,
+    ).toBe(400);
+  });
+
   it("verifies JWT then introspects every request and maps only the pinned identity realm", async () => {
     const f = await fixture();
     expect(await readNativeCatalogPrincipal(f.request(), cfg)).toEqual({
@@ -164,6 +199,9 @@ describe("native catalog resource boundary", () => {
     expect(rejected.status).toBe(401);
     expect(rejected.headers.get("WWW-Authenticate")).toContain(
       'error="invalid_token"',
+    );
+    expect(rejected.headers.get("WWW-Authenticate")).toContain(
+      origin + "/.well-known/oauth-protected-resource/api/connections",
     );
   });
   it("fails closed on introspection failure, redirects, oversized or mismatched responses", async () => {
