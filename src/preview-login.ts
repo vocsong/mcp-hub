@@ -1,9 +1,28 @@
 import preview from "./preview";
 import { handleLogin, cleanupLogin, type LoginEnv } from "./login/worker";
+import { handleAccountCatalog, type CapabilityEnv } from "./authorization";
+/** The production preview entry: identity-only login, the static mock, and — only
+ * behind NATIVE_CATALOG_ENABLED — the read-only account catalog. Nothing else from
+ * the capability/OAuth stack is routed here, whatever APP_MODE or
+ * CAPABILITY_AUTH_ENABLED say.
+ */
+export type PreviewEnv = LoginEnv & CapabilityEnv;
+// Mirrors the staging entry's catalog wrapper. The mock never sends HSTS.
+const secureResponse = (response: Response) => {
+  const result = new Response(response.body, response);
+  result.headers.set("Strict-Transport-Security", "max-age=86400");
+  return result;
+};
 export default {
-  async fetch(request: Request, env: LoginEnv): Promise<Response> {
+  async fetch(request: Request, env: PreviewEnv): Promise<Response> {
     const login = await handleLogin(request, env);
     if (login) return login;
+    if (env.NATIVE_CATALOG_ENABLED === "true") {
+      // Owns exactly /api/connections and its protected-resource metadata; null
+      // for every other path, which falls through to the unchanged mock.
+      const catalog = await handleAccountCatalog(request, env);
+      if (catalog) return secureResponse(catalog);
+    }
     const result = preview.fetch(request);
     if (
       new URL(request.url).pathname === "/health" &&
@@ -23,7 +42,7 @@ export default {
     }
     return result;
   },
-  async scheduled(_event: ScheduledController, env: LoginEnv): Promise<void> {
+  async scheduled(_event: ScheduledController, env: PreviewEnv): Promise<void> {
     await cleanupLogin(env);
   },
-} satisfies ExportedHandler<LoginEnv>;
+} satisfies ExportedHandler<PreviewEnv>;

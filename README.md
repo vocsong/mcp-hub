@@ -30,7 +30,11 @@ allowlisted Vocs Login staging issuer/client. Production stays unchanged.
 An optional identity-only integration is prepared at `/login` and `/account`,
 with GitHub handled by `auth.vocs.io` and Google deferred. The default development config remains disabled; the dedicated
 `wrangler.preview.live.jsonc` records the approved identity-only live test. It does
-not change mock interactions or authorize MCP/paid capabilities. Product
+not change mock interactions or authorize MCP/paid capabilities. Behind
+`NATIVE_CATALOG_ENABLED` it also serves the read-only native account catalog
+(`/api/connections` and its protected-resource metadata). Rollback is to remove
+the flag or restore version `5eafc706`. See
+[Account connections](docs/ACCOUNT-CONNECTIONS.md#production-preview-entry-mcpvocsio). Product
 sessions last at most 30 minutes. See [the contract, security boundaries and exact
 activation gates](docs/SHARED-LOGIN.md). The older standalone Better Auth draft
 (PR #1) is not required for this integration.

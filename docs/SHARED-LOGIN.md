@@ -97,7 +97,9 @@ narrow PKCE client registration.
   the Vocs Login database, the abandoned PR #1 database, or unrelated product data.
 - Product activation: retain `PUBLIC_ORIGIN=https://mcp.vocs.io`, set
   `PRODUCT_LOGIN_ENABLED=true` only after approval, and deploy the preview wrapper
-  with the dedicated `wrangler.preview.live.jsonc`. `APP_MODE`/`LIVE_PROVIDER` remain disabled. No route
+  with the dedicated `wrangler.preview.live.jsonc`. `LIVE_PROVIDER` remains unset. `APP_MODE=production`
+  and `CAPABILITY_AUTH_ENABLED=true` are set only for the flagged native catalog
+  (see below); nothing else in the preview entry reads them. No route
   or DNS change is required for the existing domain, but inspect live Worker
   bindings first. Do not deploy the private `wrangler.jsonc` over the public mock.
 - Set a cleanup cron, verify safe operational monitoring, backups, retention,
@@ -161,6 +163,18 @@ is still signed in. Do not test paid/provider actions.
 deploying. Never deploy the disabled `wrangler.preview.jsonc` over the live test
 unintentionally. Before any later deployment, inspect current bindings and retain
 this product database and privacy settings.
+
+### Native account catalog on the production preview
+
+`wrangler.preview.live.jsonc` adds `NATIVE_CATALOG_ENABLED=true` (with
+`APP_MODE=production` and `CAPABILITY_AUTH_ENABLED=true`). With the flag,
+`vocs-mcp-preview` serves the read-only account catalog at `/api/connections` and its
+protected-resource metadata. Both paths are otherwise the mock 404. It also needs
+the `NATIVE_CATALOG_CLIENT_SECRET` secret. Login sessions still grant no permissions,
+and no capability, OAuth or provider route is added. Contract, deploy steps and
+smoke check: [Account connections](ACCOUNT-CONNECTIONS.md#production-preview-entry-mcpvocsio).
+Rollback: remove `NATIVE_CATALOG_ENABLED` and redeploy, or restore version
+`5eafc706-ea08-43fe-a060-e5710188df62`.
 
 Rollback is scoped to MCP Hub: disable its product login flag or restore the prior
 preview version `bde7122f-2f1a-4f06-bb59-1ded0f003ef7`; disable the exact `mcp-hub`

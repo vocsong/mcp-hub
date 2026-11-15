@@ -8,6 +8,12 @@
   "vars": {
     "PRODUCT_LOGIN_ENABLED": "true",
     "PUBLIC_ORIGIN": "https://mcp.vocs.io",
+    // Read only by the account catalog in src/preview-login.ts; the preview entry
+    // routes no other capability, OAuth, provider or dashboard path. Rollback:
+    // remove NATIVE_CATALOG_ENABLED (or restore version 5eafc706).
+    "APP_MODE": "production",
+    "CAPABILITY_AUTH_ENABLED": "true",
+    "NATIVE_CATALOG_ENABLED": "true",
   },
   "d1_databases": [
     {
