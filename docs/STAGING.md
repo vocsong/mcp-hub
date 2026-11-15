@@ -78,8 +78,12 @@ is not authorized for testing; do not grant one without separate approval.
 
 Fresh staging login still grants no capability. Each authorized test account must
 be identified through a genuine staging login, then receive an explicitly approved
-`models:read` grant in the new product database only. Do not assign
-`dashboard:manage`, `speech:write` or `audio:read` for this phase. Do not fabricate
+`models:read` grant in the new product database only. The account catalog
+(`/api/connections`, browser or native bearer) also requires `dashboard:manage`
+(`src/authorization.ts`); `models:read` alone returns 403 there. So verifying the
+catalog needs both `dashboard:manage` and `models:read`. The staging entry routes
+no dashboard mutation, so there `dashboard:manage` only admits the catalog read.
+Do not assign `speech:write` or `audio:read` for this phase. Do not fabricate
 a real user's session, use another account, or enter passwords/tokens in chat.
 Use the supported secure sign-in flow when needed.
 

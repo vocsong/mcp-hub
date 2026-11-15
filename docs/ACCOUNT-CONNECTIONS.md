@@ -60,14 +60,16 @@ and have no refresh tokens. Do not use them as a persistent desktop login.
 6. Wire the generic Vocs Code broker first, then explicit harness adapters.
    Codex app-server is one adapter, not the owner of Vocs identity or MCP.
 
-No production activation or migration is part of this slice. Existing default
-feature flags remain unchanged. Staging remains models-only.
+No migration is part of this slice. Existing default feature flags remain
+unchanged. Staging remains models-only. The production preview entry serves the
+catalog only behind `NATIVE_CATALOG_ENABLED`; see
+[Production preview entry](#production-preview-entry-mcpvocsio).
 
-## Disabled native catalog verifier
+## Native catalog verifier
 
 `NATIVE_CATALOG_ENABLED=true` and a provisioned
-`NATIVE_CATALOG_CLIENT_SECRET` enable an additional, bearer-only path. Neither is
-configured by this change. A native request cannot include browser cookies or a
+`NATIVE_CATALOG_CLIENT_SECRET` enable an additional, bearer-only path. The private
+`wrangler.jsonc` does not set them; the production preview entry below does. A native request cannot include browser cookies or a
 Cloudflare Access assertion. The same account must already have current Hub
 permissions; an identity token cannot create an account or grant tools.
 
@@ -105,3 +107,41 @@ OpenRouter resource. It is exposed only when native catalog authorization is
 configured. Native 401 responses point to this metadata via `WWW-Authenticate`.
 The catalog audience advertises only the pinned identity issuer and
 `catalog:read`, never OpenRouter execution scopes.
+
+## Production preview entry (`mcp.vocs.io`)
+
+The public production Worker `vocs-mcp-preview` (`src/preview-login.ts`, deployed
+with `wrangler.preview.live.jsonc`) routes the catalog only when
+`NATIVE_CATALOG_ENABLED=true`. It then serves exactly `GET /api/connections` and
+`GET /.well-known/oauth-protected-resource/api/connections` through the same
+`handleAccountCatalog` as staging, with the same one-day HSTS header. Without the
+flag both paths are the static mock's 404, byte for byte.
+
+- The live config also sets `APP_MODE=production` and
+  `CAPABILITY_AUTH_ENABLED=true`, because the catalog handler requires them. In
+  this entry nothing else reads either variable: login, `/health` and the static
+  mock read only `PRODUCT_LOGIN_ENABLED`, `LOGIN_DB`, `LOGIN_PROFILE` and
+  `PUBLIC_ORIGIN`. No client-token, OAuth, provider, Tenant, speech/audio or
+  dashboard route is added; every other path is still the mock.
+- `LOGIN_PROFILE` is unset, so the production realm applies: resource
+  `https://mcp.vocs.io/api/connections`, issuer `https://auth.vocs.io/api/auth`,
+  introspection client `mcp-hub-catalog`.
+- OAuth is off in this Worker (no `OAUTH_ENABLED`/`OAUTH_KV`), so OpenRouter is
+  listed with `authorization: "unavailable"` and `authorizationServer: null`.
+- Metadata fails closed with 503 until the `NATIVE_CATALOG_CLIENT_SECRET` secret is
+  provisioned. Anonymous reads are 401 with a `WWW-Authenticate` challenge pointing
+  at the metadata URL, and foreign `Origin` reads are 403.
+- An account sees a connection only with `dashboard:manage` plus a capability
+  grant such as `models:read` in `vocs-mcp-login`. That table holds no rows unless an
+  operator adds them, so a verified token alone returns 403.
+
+Deploy (operator, after review): put the `NATIVE_CATALOG_CLIENT_SECRET` secret on
+`vocs-mcp-preview`, deploy with `wrangler.preview.live.jsonc`, then run
+`npm run check:native:production`. That is an anonymous, credential-free check pinned
+to `https://mcp.vocs.io`.
+
+Rollback: remove `NATIVE_CATALOG_ENABLED` from the live config and redeploy, or
+restore the prior version `5eafc706-ea08-43fe-a060-e5710188df62`. Then
+`node scripts/check-native-production.mjs` (without `--enabled`) confirms both
+catalog paths are the mock 404 again. Rollback does not touch `LOGIN_DB` data or
+Vocs Login sessions.
