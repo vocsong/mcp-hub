@@ -14,6 +14,8 @@ import {
 export interface LoginEnv extends LoginProfileEnv {
   PRODUCT_LOGIN_ENABLED?: string;
   LOGIN_DB?: D1Database;
+  /** Workers rate limiting: a per-caller sign-in start budget, counted at the edge. */
+  LOGIN_START_LIMIT?: { limit(options: { key: string }): Promise<{ success: boolean }> };
 }
 export const VOCS_ISSUER = PRODUCTION_LOGIN.issuer;
 export const PRODUCT_CLIENT = PRODUCTION_LOGIN.clientId;
@@ -138,15 +140,23 @@ async function start(
   request: Request,
   db: D1Database,
   profile: LoginProfile,
+  limiter?: LoginEnv["LOGIN_START_LIMIT"],
 ): Promise<Response> {
-  // A single bounded, anonymous counter protects database growth. No IP/user-agent storage.
+  // One caller cannot use up everybody's sign-in starts: a per-caller budget, keyed by a hash
+  // of the address and counted by Cloudflare at the edge. The Hub stores no IP or user agent.
+  if (limiter) {
+    const caller = request.headers.get("CF-Connecting-IP") ?? "unknown";
+    const { success } = await limiter.limit({ key: await hashLoginToken("login-start." + caller) });
+    if (!success) return json({ error: "try_later" }, 429);
+  }
+  // A single bounded, anonymous counter still protects database growth.
   const window = Math.floor(Date.now() / 60_000);
   const limited = await db
     .prepare(
       `INSERT INTO hub_login_rate(id, window, count) VALUES (1, ?, 1)
     ON CONFLICT(id) DO UPDATE SET window = excluded.window,
     count = CASE WHEN window = excluded.window THEN count + 1 ELSE 1 END
-    WHERE window != excluded.window OR count < 120 RETURNING count`,
+    WHERE window != excluded.window OR count < 600 RETURNING count`,
     )
     .bind(window)
     .first();
@@ -419,7 +429,7 @@ export async function handleLogin(
       )
         return json({ error: "invalid_request" }, 400);
       if (url.pathname === "/login/start")
-        return start(request, env.LOGIN_DB, profile);
+        return start(request, env.LOGIN_DB, profile, env.LOGIN_START_LIMIT);
       const browser = readCookie(request, STATE_COOKIE);
       const token =
         url.pathname === "/login/logout"

@@ -28,6 +28,12 @@
   "kv_namespaces": [
     { "binding": "OAUTH_KV", "id": "77eacdfb748045dcad7f9e90e80d1da8" },
   ],
+  // Per-caller sign-in start budget (src/login/worker.ts start), counted at the edge; keys are
+  // hashes of the caller address and nothing is stored by the Hub. Namespace ids are account-wide:
+  // the relay uses 4101-4105, this Hub 4202.
+  "ratelimits": [
+    { "name": "LOGIN_START_LIMIT", "namespace_id": "4202", "simple": { "limit": 10, "period": 60 } },
+  ],
   "triggers": { "crons": ["*/15 * * * *"] },
   "observability": {
     "enabled": false,

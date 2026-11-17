@@ -558,9 +558,34 @@ describe("shared Vocs Login", () => {
       ).status,
     ).toBe(503);
   });
+  it("gives each caller its own start budget, so one caller cannot block everyone", async () => {
+    // A stand-in for the Workers rate-limiting binding: ten starts per key.
+    const seen = new Map<string, number>();
+    const keys: string[] = [];
+    const limited: LoginEnv = {
+      ...cfg,
+      LOGIN_START_LIMIT: {
+        async limit({ key }) {
+          keys.push(key);
+          seen.set(key, (seen.get(key) ?? 0) + 1);
+          return { success: seen.get(key)! <= 10 };
+        },
+      },
+    };
+    const from = (ip: string) =>
+      run(req("/login/start", {}, { "CF-Connecting-IP": ip }), limited);
+    for (let i = 0; i < 10; i++) expect((await from("203.0.113.7")).status).toBe(200);
+    const blocked = await from("203.0.113.7");
+    expect(blocked.status).toBe(429);
+    expect(await blocked.json()).toEqual({ error: "try_later" });
+    // Somebody else still signs in, and the budget never sees an address.
+    expect((await from("198.51.100.9")).status).toBe(200);
+    expect(keys.join(" ")).not.toContain("203.0.113");
+    expect(new Set(keys).size).toBe(2);
+  });
   it("limits start traffic atomically without retaining IP addresses", async () => {
     await db
-      .prepare("INSERT INTO hub_login_rate VALUES (1, ?, 119)")
+      .prepare("INSERT INTO hub_login_rate VALUES (1, ?, 599)")
       .bind(Math.floor(Date.now() / 60000))
       .run();
     const responses = await Promise.all(
