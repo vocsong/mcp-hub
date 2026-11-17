@@ -114,8 +114,9 @@ The public production Worker `vocs-mcp-preview` (`src/preview-login.ts`, deploye
 with `wrangler.preview.live.jsonc`) routes the catalog only when
 `NATIVE_CATALOG_ENABLED=true`. It then serves exactly `GET /api/connections` and
 `GET /.well-known/oauth-protected-resource/api/connections` through the same
-`handleAccountCatalog` as staging, with the same one-day HSTS header. Without the
-flag both paths are the static mock's 404, byte for byte.
+`handleAccountCatalog` as staging. Without the flag both paths are the static mock's
+404, byte for byte apart from HSTS: every response from this production entry carries
+`Strict-Transport-Security: max-age=31536000` (this host only).
 
 - The live config also sets `APP_MODE=production` and
   `CAPABILITY_AUTH_ENABLED=true`, because the catalog handler requires them. In

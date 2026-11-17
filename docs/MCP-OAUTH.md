@@ -159,8 +159,8 @@ Before broader capability activation, beyond the deployed models-only staging:
    or authorized two-account test fixtures were available, so this gate is open.
 2. Review the five-minute residual upstream revocation window, short-grant UX,
    login restart behavior and missing HSTS observed on `mcp.vocs.io` responses.
-   The identity service did return HSTS. Production headers remain unchanged;
-   the isolated staging entry now sets HSTS.
+   The identity service did return HSTS. The production entry now sends one-year
+   HSTS on every response, and the isolated staging entry sets a one-day HSTS.
 3. Review exact grants, new D1 migration/KV binding, cron, metadata fetching, client
    registration limits, private storage, encryption secret provisioning and logs.
 4. Verify actual Dots and Vocs Code discovery/consent, requested scopes, CIMD or

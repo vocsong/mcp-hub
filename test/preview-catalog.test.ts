@@ -50,10 +50,14 @@ describe("production preview native catalog", () => {
       for (const url of [resource, metadataUrl]) {
         const response = await preview.fetch(get(url), settings);
         expect(response.status).toBe(404);
+        // The production host adds only HSTS; everything else is the mock's.
+        expect(response.headers.get("Strict-Transport-Security")).toBe(
+          "max-age=31536000",
+        );
+        response.headers.delete("Strict-Transport-Security");
         expect(await snapshot(response)).toEqual(
           await snapshot(mock.fetch(get(url))),
         );
-        expect(response.headers.get("Strict-Transport-Security")).toBeNull();
       }
   });
   it("with the flag serves the exact production protected-resource metadata", async () => {
@@ -68,7 +72,7 @@ describe("production preview native catalog", () => {
     });
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(response.headers.get("Strict-Transport-Security")).toBe(
-      "max-age=86400",
+      "max-age=31536000",
     );
     // Secret not yet provisioned: fails closed instead of advertising.
     expect(
@@ -91,7 +95,7 @@ describe("production preview native catalog", () => {
       );
       expect(response.headers.get("Cache-Control")).toBe("no-store");
       expect(response.headers.get("Strict-Transport-Security")).toBe(
-        "max-age=86400",
+        "max-age=31536000",
       );
     }
     const foreign = await preview.fetch(
@@ -107,6 +111,16 @@ describe("production preview native catalog", () => {
         .status,
     ).toBe(405);
     expect(network).not.toHaveBeenCalled();
+  });
+  it("sends one-year HSTS from every production route, with or without the flag", async () => {
+    for (const settings of [live, enabled])
+      for (const path of ["/", "/dashboard", "/app.js", "/health", "/login", "/login/session", "/api/connections"]) {
+        const response = await preview.fetch(get(origin + path), settings);
+        expect(
+          response.headers.get("Strict-Transport-Security"),
+          `${path} (${settings === live ? "flag off" : "flag on"})`,
+        ).toBe("max-age=31536000");
+      }
   });
   it("with the flag leaves every other preview route exactly as the mock", async () => {
     for (const path of [

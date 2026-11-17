@@ -21,12 +21,12 @@ async function get(path, init = {}) {
   );
   return response;
 }
-// The catalog responses carry HSTS like staging; the static mock never did.
+// Every production response, mock or catalog, carries one-year HSTS.
 const catalog = async (path, init) => {
   const response = await get(path, init);
   assert.equal(
-    !!response.headers.get("strict-transport-security"),
-    expectedEnabled,
+    response.headers.get("strict-transport-security"),
+    "max-age=31536000",
     `${path}: HSTS`,
   );
   return response;
