@@ -66,9 +66,11 @@ not issue JWTs or MCP access/refresh tokens.
   provider keys, audio, budgets or paid calls. Existing JWT authorization is not
   silently adapted to the Vocs identity handoff.
 - Login pages/API use no-store, no-referrer, strict CSP and same-origin mutations.
-  A bounded anonymous database counter admits at most 120 starts/minute globally;
-  it is not per-user abuse protection. An attacker can exhaust it. Appropriate
-  edge rate limits and monitoring are a deployment gate, not claimed complete.
+  Each caller gets 10 starts/minute from the `LOGIN_START_LIMIT` Workers rate-limiting
+  binding, keyed by a hash of the caller address and counted at the edge (the Hub stores
+  no address). A bounded anonymous database counter still caps all starts at 600/minute
+  to protect database growth; exhausting it now takes many callers. Monitoring remains
+  a deployment gate, not claimed complete.
 - Never log URLs/query strings, headers, cookies, codes, PKCE values, exchange
   responses or session rows. D1 verifier material requires restricted operator
   access and retention. Expired flows are removed on new starts; scheduled cleanup
@@ -104,7 +106,7 @@ narrow PKCE client registration.
   bindings first. Do not deploy the private `wrangler.jsonc` over the public mock.
 - Set a cleanup cron, verify safe operational monitoring, backups, retention,
   database location and additional edge rate limits before wider release. The
-  invited identity-only test uses the application-level 120-starts/minute cap. Raw request logs/traces
+  invited identity-only test uses the per-caller edge budget and the 600-starts/minute cap. Raw request logs/traces
   remain disabled because callback queries carry short-lived authorization codes.
   Enable only a reviewed redacted telemetry path, never request-payload logging.
 
