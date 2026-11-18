@@ -78,13 +78,24 @@ JWKS at `/api/auth/jwks` and confidential introspection at
 `/api/auth/oauth2/introspect`. Production and staging mappings are fixed in code.
 There are no caller-controlled issuer, JWKS, introspection or resource URLs.
 
-Accepted tokens must be ES256 `at+jwt`, issued to `vocs-code`, with exact string
-audience equal to this realm's `/api/connections` URL, exact scope `catalog:read`,
-nonempty `sub` and `sid`, and at most 300 seconds lifetime. Identity realm mapping
-is explicit: the OAuth issuer's `/api/auth` suffix is not a new Hub account owner.
-`sid` is the **source browser session**, not a per-device ID. DPoP/proof-bound
-tokens are rejected until proof verification is implemented; they must not be
-downgraded to bearer use.
+Accepted tokens must be ES256 `at+jwt`, issued to one of two public desktop
+clients, with exact string audience equal to this realm's `/api/connections` URL,
+exact scope `catalog:read`, nonempty `sub` and `sid`, and at most 300 seconds
+lifetime. Identity realm mapping is explicit: the OAuth issuer's `/api/auth`
+suffix is not a new Hub account owner. DPoP/proof-bound tokens are rejected until
+proof verification is implemented; they must not be downgraded to bearer use.
+
+| Client (`azp` = `client_id`) | Sign-in                      | `sid` means                |
+| ---------------------------- | ---------------------------- | -------------------------- |
+| `vocs-code`                  | per sign-in, not persistent  | the source browser session |
+| `vocs-code-device`           | "Keep me signed in" (device) | the device grant id        |
+
+`azp` must be one of these exactly; a signed `client_id`, when present, must equal
+it, and the device client must sign it. Introspection must report the same `azp`
+and `client_id`, so a token cannot change client between signature and
+introspection. A device token stays valid only while its device grant is live:
+the identity service answers its introspection from the grant and reports it
+inactive once the device is revoked, idle-expired or past its absolute expiry.
 
 After signature/claims verification, each request introspects the token with a
 server-only confidential client. Its ID is `mcp-hub-catalog` (or

@@ -9,6 +9,13 @@ export interface NativeCatalogEnv extends LoginProfileEnv {
   NATIVE_CATALOG_ENABLED?: string;
   NATIVE_CATALOG_CLIENT_SECRET?: string;
 }
+/** Public desktop clients allowed to read the catalog. `vocs-code` is the
+ * per-sign-in client (`sid` = source browser session); `vocs-code-device` is the
+ * persistent desktop client (`sid` = device grant id). */
+const NATIVE_CLIENTS: ReadonlySet<string> = new Set([
+  "vocs-code",
+  "vocs-code-device",
+]);
 async function boundedResponse(
   response: Response,
   max: number,
@@ -100,7 +107,11 @@ export async function readNativeCatalogPrincipal(
       typeof payload.sid !== "string" ||
       !payload.sid ||
       payload.sid.length > 256 ||
-      payload.azp !== "vocs-code" ||
+      typeof payload.azp !== "string" ||
+      !NATIVE_CLIENTS.has(payload.azp) ||
+      // The device client always signs client_id; when present it must name azp.
+      (payload.azp === "vocs-code-device" && payload.client_id === undefined) ||
+      (payload.client_id !== undefined && payload.client_id !== payload.azp) ||
       payload.scope !== "catalog:read" ||
       typeof payload.iat !== "number" ||
       typeof payload.exp !== "number" ||
@@ -145,8 +156,8 @@ export async function readNativeCatalogPrincipal(
       claims.sub !== payload.sub ||
       claims.aud !== resource ||
       claims.scope !== "catalog:read" ||
-      claims.azp !== "vocs-code" ||
-      claims.client_id !== "vocs-code" ||
+      claims.azp !== payload.azp ||
+      claims.client_id !== payload.azp ||
       claims.sid !== payload.sid ||
       claims.exp !== payload.exp ||
       claims.iat !== payload.iat ||
