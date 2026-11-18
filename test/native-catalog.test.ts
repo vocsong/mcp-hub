@@ -70,7 +70,7 @@ async function fixture(overrides: Record<string, unknown> = {}) {
       expect(body.get("token")).toBe(token);
       return Response.json({
         ...claims,
-        client_id: "vocs-code",
+        client_id: "client_id" in claims ? claims.client_id : claims.azp,
         token_type: "Bearer",
         active,
       });
@@ -276,5 +276,140 @@ describe("native catalog resource boundary", () => {
       .bind(Date.now(), "catalog-alice")
       .run();
     expect((await handleAccountCatalog(f.request(), cfg))!.status).toBe(403);
+  });
+});
+describe("persistent desktop client (vocs-code-device)", () => {
+  const device = {
+    azp: "vocs-code-device",
+    client_id: "vocs-code-device",
+    sid: "device-grant-id",
+  };
+  /** True when the only network traffic was the JWKS fetch. */
+  const onlyKeys = (network: { mock: { calls: unknown[][] } }) =>
+    network.mock.calls.every(([url]) => String(url) === issuer + "/jwks");
+  async function introspectingAs(changed: Record<string, unknown>) {
+    const f = await fixture(device);
+    f.network.mockImplementation(async (input) =>
+      String(input).endsWith("/jwks")
+        ? Response.json({ keys: [jwk] })
+        : Response.json({
+            ...f.claims,
+            active: true,
+            token_type: "Bearer",
+            ...changed,
+          }),
+    );
+    return f;
+  }
+
+  it("accepts a device token end to end when introspection matches the grant", async () => {
+    const f = await fixture(device);
+    expect(await readNativeCatalogPrincipal(f.request(), cfg)).toEqual({
+      issuer: "https://auth.vocs.io",
+      subject: "catalog-alice",
+    });
+    expect(f.network).toHaveBeenCalledTimes(2);
+    const introspection = f.network.mock.calls.find(
+      ([url]) => String(url) === issuer + "/oauth2/introspect",
+    )!;
+    expect(
+      new URLSearchParams(String(introspection[1]?.body)).get("token"),
+    ).toBe(f.token);
+    // A revoked device grant is inactive at introspection and stops the next request.
+    f.revoke();
+    await expect(readNativeCatalogPrincipal(f.request(), cfg)).rejects.toThrow(
+      "invalid_identity",
+    );
+    vi.restoreAllMocks();
+    // The full catalog handler serves a granted account through the device client.
+    await db
+      .prepare("INSERT INTO hub_login_principal VALUES (?, ?, NULL)")
+      .bind("https://auth.vocs.io", "device-alice")
+      .run();
+    for (const grant of ["dashboard:manage", "models:read"])
+      await db
+        .prepare("INSERT INTO hub_login_permission VALUES (?, ?, ?)")
+        .bind("https://auth.vocs.io", "device-alice", grant)
+        .run();
+    const g = await fixture({ ...device, sub: "device-alice" });
+    const response = (await handleAccountCatalog(g.request(), cfg))!;
+    expect(response.status).toBe(200);
+    expect(
+      ((await response.json()) as any).connections[0].accountScopes,
+    ).toEqual(["models:read"]);
+  });
+
+  it("keeps the vocs-code path: a signed client_id must name azp too", async () => {
+    const f = await fixture({ client_id: "vocs-code" });
+    expect(await readNativeCatalogPrincipal(f.request(), cfg)).toEqual({
+      issuer: "https://auth.vocs.io",
+      subject: "catalog-alice",
+    });
+  });
+
+  it("rejects mismatched, missing or unknown clients and every other pin before introspection", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    for (const override of [
+      { ...device, client_id: "vocs-code" },
+      { azp: "vocs-code", client_id: "vocs-code-device" },
+      { ...device, client_id: undefined },
+      { ...device, client_id: 7 },
+      { azp: "vocs-code-other", client_id: "vocs-code-other" },
+      { azp: "Vocs-Code-Device", client_id: "Vocs-Code-Device" },
+      { azp: ["vocs-code-device"], client_id: "vocs-code-device" },
+      { ...device, cnf: { jkt: "proof-bound" } },
+      { ...device, exp: now + 301 },
+      { ...device, iat: now - 100, exp: now + 300 },
+      { ...device, sid: "" },
+      { ...device, scope: "catalog:read offline_access" },
+      { ...device, aud: origin + "/openrouter" },
+      { ...device, iss: "https://elsewhere.example/api/auth" },
+    ]) {
+      const f = await fixture(override);
+      await expect(
+        readNativeCatalogPrincipal(f.request(), cfg),
+        JSON.stringify(override),
+      ).rejects.toThrow("invalid_identity");
+      expect(onlyKeys(f.network), JSON.stringify(override)).toBe(true);
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("rejects an introspection that disagrees on the client, session or binding", async () => {
+    for (const changed of [
+      { azp: "vocs-code", client_id: "vocs-code" },
+      { client_id: "vocs-code" },
+      { azp: "vocs-code" },
+      { azp: "other-app", client_id: "other-app" },
+      { client_id: undefined },
+      { sid: "source-session" },
+      { cnf: { jkt: "proof-bound" } },
+      { exp: Math.floor(Date.now() / 1000) + 600 },
+      { token_type: "DPoP" },
+      { active: false },
+    ]) {
+      const f = await introspectingAs(changed);
+      await expect(
+        readNativeCatalogPrincipal(f.request(), cfg),
+        JSON.stringify(changed),
+      ).rejects.toThrow("invalid_identity");
+      vi.restoreAllMocks();
+    }
+    // A vocs-code token cannot be upgraded by a device-client introspection.
+    const f = await fixture();
+    f.network.mockImplementation(async (input) =>
+      String(input).endsWith("/jwks")
+        ? Response.json({ keys: [jwk] })
+        : Response.json({
+            ...f.claims,
+            active: true,
+            token_type: "Bearer",
+            azp: "vocs-code-device",
+            client_id: "vocs-code-device",
+          }),
+    );
+    await expect(readNativeCatalogPrincipal(f.request(), cfg)).rejects.toThrow(
+      "invalid_identity",
+    );
   });
 });

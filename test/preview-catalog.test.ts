@@ -242,4 +242,74 @@ describe("production preview native catalog", () => {
       },
     ]);
   });
+  it("with the flag admits the persistent desktop client only when introspection names the same client", async () => {
+    const pair = await generateKeyPair("ES256");
+    const jwk = {
+      ...(await exportJWK(pair.publicKey)),
+      kid: "fixture",
+      alg: "ES256",
+      use: "sig",
+    };
+    const now = Math.floor(Date.now() / 1000);
+    const claims = {
+      iss: issuer,
+      sub: "preview-device-alice",
+      aud: resource,
+      iat: now,
+      exp: now + 300,
+      sid: "device-grant-id",
+      azp: "vocs-code-device",
+      client_id: "vocs-code-device",
+      scope: "catalog:read",
+    };
+    const token = await new SignJWT(claims)
+      .setProtectedHeader({ alg: "ES256", kid: "fixture", typ: "at+jwt" })
+      .sign(pair.privateKey);
+    let introspected: Record<string, unknown> = claims;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, options) => {
+      if (String(input) === issuer + "/jwks")
+        return Response.json({ keys: [jwk] });
+      expect(String(input)).toBe(issuer + "/oauth2/introspect");
+      const body = new URLSearchParams(String(options?.body));
+      expect(body.get("client_id")).toBe("mcp-hub-catalog");
+      expect(body.get("token")).toBe(token);
+      return Response.json({
+        ...introspected,
+        token_type: "Bearer",
+        active: true,
+      });
+    });
+    const request = () => get(resource, { Authorization: "Bearer " + token });
+    await db
+      .prepare("INSERT INTO hub_login_principal VALUES (?, ?, NULL)")
+      .bind("https://auth.vocs.io", "preview-device-alice")
+      .run();
+    for (const grant of ["dashboard:manage", "models:read"])
+      await db
+        .prepare("INSERT INTO hub_login_permission VALUES (?, ?, ?)")
+        .bind("https://auth.vocs.io", "preview-device-alice", grant)
+        .run();
+    const response = await preview.fetch(request(), enabled);
+    expect(response.status).toBe(200);
+    expect(
+      (
+        (await response.json()) as {
+          connections: { accountScopes: string[] }[];
+        }
+      ).connections[0].accountScopes,
+    ).toEqual(["models:read"]);
+    // The flag-off production entry still serves nothing for the same token.
+    expect((await preview.fetch(request(), live)).status).toBe(404);
+    for (const changed of [
+      { azp: "vocs-code", client_id: "vocs-code" },
+      { client_id: "vocs-code" },
+    ]) {
+      introspected = { ...claims, ...changed };
+      const rejected = await preview.fetch(request(), enabled);
+      expect(rejected.status, JSON.stringify(changed)).toBe(401);
+      expect(rejected.headers.get("WWW-Authenticate")).toContain(
+        'error="invalid_token"',
+      );
+    }
+  });
 });
