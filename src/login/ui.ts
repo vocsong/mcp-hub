@@ -1,16 +1,41 @@
 import type { LoginProfile } from "./profile";
-const shell = (title: string, content: string) =>
-  `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} · MCP Hub</title><link rel="stylesheet" href="/login/ui.css"><script src="/login/ui.js" defer></script></head><body><main><a href="/">MCP Hub</a><h1>${title}</h1>${content}<p id="status" role="status" aria-live="polite"></p><p><a href="/">Back to the public mock preview</a></p></main></body></html>`;
+// Explicit .ts specifiers: scripts/check-login-ui.mjs loads this module with Node.
+import { focusPage, icon, requester } from "../ui/shell.ts";
+import { rewrite } from "../ui/rewrite.ts";
+/** Vocs UI focus shell. The <h1> stays attribute-free; the status region is always present. */
+const shell = (
+  title: string,
+  who: string,
+  lead: string,
+  actions: string,
+  before = "",
+  after = "",
+) =>
+  focusPage({
+    title: `${title} · MCP Hub`,
+    head: '<script src="/login/ui.js" defer></script>',
+    card: `${requester(who, "MCP Hub")}<div class="mcp-focus-title"><h1>${title}</h1>${lead}</div>${before}<div class="mcp-actions">${actions}<p id="status" class="mcp-status" role="status" aria-live="polite"></p></div>${after}`,
+    foot: '<a href="/">← Back to the public mock preview</a><span>Private by invitation</span>',
+  });
 export const loginHtml = (failed: boolean) =>
   shell(
     "Sign in to MCP Hub",
-    `<p>Continue through Vocs Login with GitHub. Google is not available yet.</p><p>Only your stable Vocs account identifier is shared. This does not authorize MCP clients, paid requests, or backend access.</p>${failed ? "<p>The sign-in could not finish. Start again from here.</p>" : ""}<p>If Vocs Login asks you to sign in, finish there, return here, and start again.</p><button id="start">Continue with Vocs Login</button> <button id="cancel">Cancel pending sign-in</button>`,
+    "Signing in to",
+    '<p class="v-text">Continue through Vocs Login with GitHub. Google is not available yet.</p>',
+    '<button id="start" class="v-btn v-btn-primary v-btn-lg v-btn-block">Continue with Vocs Login <span class="v-arrow" aria-hidden="true">→</span></button><button id="cancel" class="v-btn v-btn-secondary v-btn-block">Cancel pending sign-in</button>',
+    failed
+      ? `<div class="v-note v-note-danger">${icon.alert()}<span>The sign-in could not finish. Start again from here.</span></div>`
+      : "",
+    `<p class="mcp-hint">If Vocs Login asks you to sign in, finish there, return here, and start again.</p><div class="v-note">${icon.lock()}<span>Only your stable Vocs account identifier is shared. This does not authorize MCP clients, paid requests, or backend access.</span></div>`,
   );
 export const accountHtml = shell(
   "Your MCP Hub account",
-  `<p id="account">Checking your session…</p><p>Product permissions: none. The dashboard is still a public mock, and paid capabilities remain disabled.</p><p>This product session lasts up to 30 minutes. Signing out here does not sign you out of Vocs Login.</p><button id="logout" disabled>Sign out of MCP Hub</button> <a href="/login">Sign in again</a>`,
+  "Your account on",
+  '<p id="account" class="v-text mcp-account">Checking your session…</p>',
+  '<button id="logout" class="v-btn v-btn-secondary v-btn-lg v-btn-block" disabled>Sign out of MCP Hub</button><a class="v-btn v-btn-ghost" href="/login">Sign in again</a>',
+  `<div class="v-note">${icon.info()}<span>Product permissions: none. The dashboard is still a public mock, and paid capabilities remain disabled.</span></div>`,
+  '<p class="mcp-hint">This product session lasts up to 30 minutes. Signing out here does not sign you out of Vocs Login.</p>',
 );
-export const loginCss = `:root{color-scheme:light dark;font-family:system-ui,sans-serif}body{margin:0}main{max-width:38rem;margin:8vh auto;padding:1.5rem;line-height:1.6}h1{line-height:1.2}a{color:inherit}button{font:inherit;cursor:pointer;padding:.6rem 1rem;margin:.3rem 0}button:disabled{cursor:wait;opacity:.6}:focus-visible{outline:3px solid #698cff;outline-offset:4px}#status{min-height:1.6em}#account{overflow-wrap:anywhere}`;
 export const loginScript = `const status=document.querySelector('#status');let busy=false;let generation=0;let starting=false;let navigation=0;
 async function post(path){const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}',credentials:'same-origin',redirect:'error'});if(!response.ok)throw Error();return response.json();}
 async function action(button,run){if(busy)return;busy=true;button.disabled=true;status.textContent='Working…';try{await run();}catch{status.textContent='Could not finish. Please try again.';}finally{busy=false;button.disabled=false;}}
@@ -24,10 +49,12 @@ addEventListener('pagehide',()=>{++generation;++navigation;});addEventListener('
 /** Production remains byte-for-byte unchanged; staging gets its own fixed redirect guard. */
 export function loginScriptForProfile(profile: LoginProfile): string {
   if (profile.name === "production") return loginScript;
-  return loginScript.replace(
-    "destination.origin!=='https://auth.vocs.io'||destination.pathname!=='/authorize'",
-    `destination.origin!==${JSON.stringify(profile.issuer)}||destination.pathname!=='/authorize'||destination.searchParams.getAll('client_id').length!==1||destination.searchParams.get('client_id')!==${JSON.stringify(profile.clientId)}||destination.searchParams.getAll('redirect_uri').length!==1||destination.searchParams.get('redirect_uri')!==${JSON.stringify(profile.origin + "/login/callback")}`,
-  );
+  return rewrite(loginScript, [
+    [
+      "destination.origin!=='https://auth.vocs.io'||destination.pathname!=='/authorize'",
+      `destination.origin!==${JSON.stringify(profile.issuer)}||destination.pathname!=='/authorize'||destination.searchParams.getAll('client_id').length!==1||destination.searchParams.get('client_id')!==${JSON.stringify(profile.clientId)}||destination.searchParams.getAll('redirect_uri').length!==1||destination.searchParams.get('redirect_uri')!==${JSON.stringify(profile.origin + "/login/callback")}`,
+    ],
+  ]);
 }
 
 export function loginHtmlForProfile(
@@ -36,21 +63,32 @@ export function loginHtmlForProfile(
 ): string {
   const html = loginHtml(failed);
   if (profile.name === "production") return html;
-  return html
-    .replaceAll("Sign in to MCP Hub", "Sign in to MCP Hub staging")
-    .replace(
+  // Guarded: each staging edit must match, so production copy can never leak into staging.
+  return rewrite(html, [
+    ["Sign in to MCP Hub", "Sign in to MCP Hub staging", "all"],
+    [
       "Continue through Vocs Login with GitHub. Google is not available yet.",
       "Continue through the separate Vocs Login staging service using your existing staging account.",
-    )
-    .replace("Back to the public mock preview", "Back to models-only staging");
+    ],
+    ["Back to the public mock preview", "Back to models-only staging"],
+    [
+      '<div class="v-requester-what">MCP Hub</div>',
+      '<div class="v-requester-what">MCP Hub staging</div>',
+    ],
+  ]);
 }
 export function accountHtmlForProfile(profile: LoginProfile): string {
   if (profile.name === "production") return accountHtml;
-  return accountHtml
-    .replaceAll("Your MCP Hub account", "Your staging MCP Hub account")
-    .replace(
+  return rewrite(accountHtml, [
+    ["Your MCP Hub account", "Your staging MCP Hub account", "all"],
+    [
       "Product permissions: none. The dashboard is still a public mock, and paid capabilities remain disabled.",
       "Sign-in alone grants no MCP access. Restart authorization from your client to request models:read. Paid requests, keys, audio and dashboard changes are unavailable in staging.",
-    )
-    .replace("Back to the public mock preview", "Back to models-only staging");
+    ],
+    ["Back to the public mock preview", "Back to models-only staging"],
+    [
+      '<div class="v-requester-what">MCP Hub</div>',
+      '<div class="v-requester-what">MCP Hub staging</div>',
+    ],
+  ]);
 }

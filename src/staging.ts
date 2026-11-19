@@ -10,6 +10,8 @@ import { handleOAuth, cleanupOAuth, type OAuthEnv } from "./oauth";
 import type { NativeCatalogEnv } from "./native-catalog";
 import { handleAccountCatalog } from "./authorization";
 import { boundedBody } from "./security";
+import { serveUiAsset } from "./ui/assets";
+import { focusPage, requester } from "./ui/shell";
 import { Fault, MODEL, type Identity } from "./types";
 export interface StagingEnv extends OAuthEnv, NativeCatalogEnv {
   STAGING_ENABLED?: string;
@@ -23,6 +25,14 @@ const headers = {
   "Content-Security-Policy":
     "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
 };
+/** The landing page may load the shared same-origin stylesheet, fonts and favicon. */
+const landingCsp =
+  "default-src 'none'; style-src 'self'; font-src 'self'; img-src 'self'; frame-ancestors 'none'; base-uri 'none'";
+const landing = focusPage({
+  title: "MCP Hub staging",
+  card: `${requester("Isolated test service", "MCP Hub staging")}<div class="mcp-focus-title"><h1>Models-only staging</h1><p class="v-text">Isolated OAuth interoperability testing. No provider keys, paid requests, audio or dashboard mutations.</p></div><p><span class="v-badge v-badge-info">models:read only</span></p><div class="mcp-actions"><a class="v-btn v-btn-primary v-btn-lg v-btn-block" href="/login">Sign in to staging <span class="v-arrow" aria-hidden="true">→</span></a></div>`,
+  foot: `<span class="v-mono">${new URL(STAGING_LOGIN.origin).host}</span><span>Private by invitation</span>`,
+});
 const secureResponse = (response: Response) => {
   const result = new Response(response.body, response);
   result.headers.set("Strict-Transport-Security", "max-age=86400");
@@ -132,6 +142,9 @@ export default {
           audio: false,
         });
       if (!enabled) return json({ error: "staging_not_enabled" }, 503);
+      // Shared Vocs UI stylesheet, fonts and favicon: static, GET/HEAD only.
+      const ui = serveUiAsset(request);
+      if (ui) return secureResponse(ui);
       const catalog = await handleAccountCatalog(request, env);
       if (catalog) return secureResponse(catalog);
       // Explicit route allowlist: there is no fallback to dashboard/manual tokens,
@@ -141,12 +154,13 @@ export default {
         if (login) return secureResponse(login);
       }
       if (path === "/" && request.method === "GET")
-        return new Response(
-          '<!doctype html><html lang="en"><meta charset="utf-8"><title>MCP Hub staging</title><h1>Models-only staging</h1><p>Isolated OAuth interoperability testing. No provider keys, paid requests, audio or dashboard mutations.</p><p><a href="/login">Sign in to staging</a></p>',
-          {
-            headers: { ...headers, "Content-Type": "text/html; charset=utf-8" },
+        return new Response(landing, {
+          headers: {
+            ...headers,
+            "Content-Security-Policy": landingCsp,
+            "Content-Type": "text/html; charset=utf-8",
           },
-        );
+        });
       if (
         path === "/openrouter" ||
         path.startsWith("/.well-known/oauth-") ||

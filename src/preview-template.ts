@@ -1,3 +1,73 @@
-/** Frozen design template: capability UI changes must not enter the public mock. */
-export const dashboard = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Vocs MCP Hub</title><link rel="stylesheet" href="/app.css"><body><main><header><span class="mark">V.</span><span>VOCS / MCP HUB</span><span class="badge">INVITE-ONLY PREVIEW</span></header><section class="hero"><p class="eyebrow">YOUR KEYS. YOUR CONTROL.</p><h1>One home for<br>your AI capabilities.</h1><p>OpenRouter is the first connection. Private by design, with spending controls and temporary audio.</p></section><div id="notice" role="status">Loading your account…</div><section class="grid"><article><span class="eyebrow">01 / CONNECT</span><h2>OpenRouter</h2><p>Endpoint <strong>/openrouter</strong></p><p id="connection"></p><form id="keys"><label>Provider API key<input id="key" type="password" autocomplete="off" placeholder="Never paste a key into chat"></label><label class="check"><input id="consent" type="checkbox">I consent to encrypted storage of this key until I disconnect it.</label><button>Save key</button><button type="button" id="disconnect" class="secondary">Disconnect</button></form><p class="muted">Demo mode refuses real keys. Live setup requires your own provider account and approved authentication.</p></article><article><span class="eyebrow">02 / CONTROL</span><h2>Your limits</h2><form id="policy"><label>Daily reservation budget (USD)<input id="budget" type="number" min="0" max="10" step="0.01" required></label><label>Audio retention (hours)<input id="retention" type="number" min="1" max="24" required></label><label class="check"><input id="approval" type="checkbox">Approve every request</label><button>Save controls</button></form><p class="muted">Each request reserves $0.10. This is a local admission limit, not a guaranteed provider billing cap. Configure a provider-key limit too.</p></article></section><section class="grid"><article><span class="eyebrow">03 / TRY IT</span><h2>Text to speech</h2><form id="speech"><label>Text<textarea id="text" maxlength="2000" required placeholder="Write a short sentence…"></textarea></label><button>Prepare request</button></form><p class="muted">The local demo returns a test tone, not speech. Text is not stored. Review the text above, then approve below. For an MCP request, paste its exact text here before approval. Model: Voxtral Mini TTS. Voice: en_paul_neutral.</p></article><article><span class="eyebrow">04 / REVIEW</span><h2>Requests & audio</h2><div id="jobs"></div><button id="refresh" class="secondary">Refresh</button><p class="muted">Audio requires your account, expires after your chosen retention, and can be deleted now. No public download links.</p></article></section><footer>VOCS MCP HUB · Local-first preview · OpenRouter now, more capabilities next.</footer></main><script src="/app.js" defer></script></body></html>`;
-export const css = `:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#202124;background:#f4f4f3;font-synthesis:none}*{box-sizing:border-box}body{margin:0}main{max-width:1120px;margin:auto;padding:34px 30px}header{display:flex;align-items:center;gap:16px;font-size:11px;letter-spacing:2px;color:#505155;padding-bottom:25px;border-bottom:1px solid #dededb}.mark{font-size:30px;color:#202124;font-weight:800;letter-spacing:-2px}.badge{margin-left:auto;border:1px solid #d3d3cf;background:#fafaf9;padding:9px 13px;border-radius:5px;font-size:9px;letter-spacing:1.3px}.hero{padding:60px 0 30px;max-width:760px}h1{font-size:clamp(38px,5.4vw,62px);line-height:1.07;letter-spacing:-2.8px;font-weight:600;margin:20px 0}p{line-height:1.65;color:#626268}.hero>p:last-child{font-size:16px;max-width:650px}.eyebrow{font-size:10px;letter-spacing:2px;color:#77777c;font-weight:600}h2{font-size:23px;letter-spacing:-.5px;font-weight:600;margin:16px 0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:20px 0}article{border:1px solid #dededb;border-radius:10px;padding:28px;background:#fff;box-shadow:0 2px 6px #00000003}label{display:block;font-size:12px;color:#47474d;margin:15px 0}input,textarea{width:100%;display:block;background:#fbfbfa;border:1px solid #d8d8d5;color:#202124;border-radius:5px;padding:12px;margin-top:8px;font:inherit}input:focus,textarea:focus,button:focus-visible,a:focus-visible{outline:2px solid #75757c;outline-offset:3px}textarea{height:110px;resize:vertical}.check{display:flex;gap:10px;align-items:flex-start;line-height:1.5}.check input{width:auto;margin:3px 0;accent-color:#333338}button{cursor:pointer;border:1px solid #28282e;border-radius:5px;background:#28282e;color:#fff;font-weight:550;padding:11px 16px;margin:5px 5px 5px 0;transition:background .15s}button:hover{background:#45454c}.secondary{background:#fff;border-color:#d3d3d0;color:#44444a}.secondary:hover{background:#efefed}button:disabled{opacity:.45;cursor:not-allowed}.muted,footer{font-size:12px;color:#737378}#notice{padding:15px 18px;border:1px solid #d9d9d5;border-radius:6px;background:#eaeae7;color:#45454b;font-size:13px;line-height:1.6}.job{padding:14px 0;border-bottom:1px solid #e7e7e4;overflow-wrap:anywhere}.job p{margin:3px 0 10px;font-size:11px;font-variant-numeric:tabular-nums}a{color:#303038;text-underline-offset:3px}footer{margin-top:40px;padding:20px 0;border-top:1px solid #dededb;line-height:1.6}.disabled-panel{background:#f7f7f5;border:1px dashed #d5d5d1;border-radius:6px;padding:17px;margin:22px 0}.disabled-panel strong{font-size:13px;font-weight:550}.disabled-panel p{margin:8px 0 0;font-size:12px}.preview-meta{font-size:11px;color:#77777c;margin-top:12px}.empty{padding:25px 0;color:#85858a;font-size:13px}@media(max-width:700px){main{padding:20px}.grid{grid-template-columns:1fr}.hero{padding-top:40px}h1{letter-spacing:-1.8px}.badge{font-size:8px;letter-spacing:.6px;padding:8px}header{gap:10px;font-size:9px}article{padding:23px}}`;
+/** Frozen design template: capability UI changes must not enter the public mock.
+ * src/preview-assets.ts derives the public page from it with guarded rewrites (each
+ * must match exactly once), so this keeps the private wording those edits replace.
+ * Vocs UI site shell; styles come from the shared same-origin stylesheet. */
+import {
+  aura,
+  brandLink,
+  headTags,
+  icon,
+  SHELL_SCRIPT,
+  switcher,
+} from "./ui/shell";
+
+export const dashboard = `<!doctype html>
+<html lang="en" data-product="mcp">
+<head>${headTags("Vocs MCP Hub")}<script src="${SHELL_SCRIPT}" defer></script><script src="/app.js" defer></script></head>
+<body class="v-root">
+<a class="v-skip" href="#main">Skip to content</a>
+<header class="v-topbar"><div class="v-wrap v-topbar-inner">${brandLink}<nav class="v-nav" aria-label="Sections"><a href="#connect">Connect</a><a href="#control">Control</a><a href="#try">Try it</a><a href="#review">Review</a></nav><div class="v-topbar-actions">${switcher}<a class="v-btn v-btn-secondary v-btn-sm" href="/login">Sign in</a></div></div></header>
+<main id="main">
+<section class="v-hero">${aura}<div class="v-wrap">
+<p class="mcp-hero-badge"><span class="v-badge v-badge-info">Invite-only preview</span></p>
+<p class="v-eyebrow">Your keys. Your control.</p>
+<h1 class="v-display-xl">One home for<br><em>your AI capabilities.</em></h1>
+<p class="v-lede">OpenRouter is the first connection. Private by design, with spending controls and temporary audio.</p>
+<div class="v-hero-actions"><a class="v-btn v-btn-primary v-btn-lg" href="#how">Try the preview <span class="v-arrow">→</span></a><a class="v-btn v-btn-secondary v-btn-lg" href="/login">Sign in with Vocs</a></div>
+</div></section>
+<section class="v-section mcp-landing mcp-anchor" id="how" aria-labelledby="how-title"><div class="v-wrap mcp-stack">
+<div class="v-section-head"><p class="v-eyebrow">How it works</p><h2 class="v-display-l" id="how-title">Connect, set limits, <em>review every request.</em></h2></div>
+<div class="v-note mcp-notice">${icon.info()}<div id="notice" role="status">Loading your account…</div></div>
+<div class="v-grid-2">
+<article class="v-card mcp-card" id="connect">
+<div class="mcp-card-head"><p class="v-eyebrow v-eyebrow-sm"><span class="mcp-step">01</span>Connect</p></div>
+<div class="mcp-card-title"><span class="v-glyph v-glyph-lg mcp-logo" aria-hidden="true">OR</span><h3 class="v-title">OpenRouter</h3></div>
+<p class="mcp-endpoint"><span>Endpoint <strong>/openrouter</strong></span><span>models · speech</span></p>
+<p id="connection" class="mcp-conn"></p>
+<form id="keys"><label class="v-field"><span class="v-label">Provider API key</span><input class="v-input" id="key" type="password" autocomplete="off" placeholder="Never paste a key into chat"></label><label class="v-check"><input id="consent" type="checkbox">I consent to encrypted storage of this key until I disconnect it.</label><div class="mcp-form-actions"><button class="v-btn v-btn-primary">Save key</button><button type="button" id="disconnect" class="v-btn v-btn-secondary">Disconnect</button></div></form>
+<p class="mcp-fine">Demo mode refuses real keys. Live setup requires your own provider account and approved authentication.</p>
+</article>
+<article class="v-card mcp-card" id="control">
+<div class="mcp-card-head"><p class="v-eyebrow v-eyebrow-sm"><span class="mcp-step">02</span>Control</p></div>
+<h3 class="v-title">Your limits</h3>
+<form id="policy" class="mcp-form"><label class="v-field"><span class="v-label">Daily reservation budget (USD)</span><input class="v-input" id="budget" type="number" min="0" max="10" step="0.01" required></label><label class="v-field"><span class="v-label">Audio retention (hours)</span><input class="v-input" id="retention" type="number" min="1" max="24" required></label><label class="mcp-toggle"><span>Approve every request</span><input id="approval" type="checkbox"></label><div class="mcp-form-actions"><button class="v-btn v-btn-primary">Save controls</button></div></form>
+<p class="mcp-fine">Each request reserves $0.10. This is a local admission limit, not a guaranteed provider billing cap. Configure a provider-key limit too.</p>
+</article>
+</div>
+<div class="v-grid-2">
+<article class="v-card mcp-card" id="try">
+<div class="mcp-card-head"><p class="v-eyebrow v-eyebrow-sm"><span class="mcp-step">03</span>Try it</p></div>
+<h3 class="v-title">Text to speech</h3>
+<form id="speech" class="mcp-form"><label class="v-field"><span class="v-label">Text</span><textarea class="v-input" id="text" maxlength="2000" required placeholder="Write a short sentence…"></textarea></label><div class="mcp-form-actions"><button class="v-btn v-btn-primary">Prepare request</button></div></form>
+<p class="mcp-fine">The local demo returns a test tone, not speech. Text is not stored. Review the text above, then approve below. For an MCP request, paste its exact text here before approval. Model: Voxtral Mini TTS. Voice: en_paul_neutral.</p>
+</article>
+<article class="v-card mcp-card" id="review">
+<div class="mcp-card-head"><p class="v-eyebrow v-eyebrow-sm"><span class="mcp-step">04</span>Review</p><button id="refresh" class="v-btn v-btn-secondary v-btn-sm">Refresh</button></div>
+<h3 class="v-title">Requests &amp; audio</h3>
+<div id="jobs" class="mcp-rows mcp-jobs"></div>
+<p class="mcp-fine">Audio requires your account, expires after your chosen retention, and can be deleted now. No public download links.</p>
+</article>
+</div>
+</div></section>
+</main>
+<footer class="v-footer"><div class="v-wrap">
+<div class="v-footer-grid">
+<div>${brandLink}<p class="v-small mcp-footer-blurb">One home for your AI capabilities. OpenRouter first, more MCP services later.</p></div>
+<div><h2>Hub</h2><ul><li><a href="#connect">Connect</a></li><li><a href="#control">Control</a></li><li><a href="#try">Try it</a></li><li><a href="#review">Review</a></li></ul></div>
+<div><h2>Vocs</h2><ul><li><a href="https://vocs.io/">vocs.io</a></li><li><a href="https://code.vocs.io/">Vocs Code</a></li></ul></div>
+<div><h2>Account</h2><ul><li><a href="/login">Sign in</a></li><li><a href="https://auth.vocs.io/account">Vocs account</a></li></ul></div>
+</div>
+<div class="v-footer-base"><span>Vocs MCP Hub · Local-first preview · OpenRouter now, more capabilities next.</span><span>Follows your system theme</span></div>
+</div></footer>
+</body>
+</html>`;

@@ -1,8 +1,8 @@
-import { css } from "./preview-template";
 import { html, previewScript, PREVIEW_VERSION } from "./preview-assets";
+import { serveUiAsset, uiCss } from "./ui/assets";
 const headers = {
   "Content-Security-Policy":
-    "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'none'; media-src blob:; img-src 'self'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'",
+    "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; media-src blob:; img-src 'self'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'",
   "Cache-Control": "no-store",
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "no-referrer",
@@ -18,6 +18,9 @@ export default {
         { error: "mock_preview_read_only", version: PREVIEW_VERSION },
         { status: 405, headers: { ...headers, Allow: "GET, HEAD" } },
       );
+    // Shared Vocs UI stylesheet, switcher script, fonts and favicon (static, same-origin).
+    const ui = serveUiAsset(req);
+    if (ui) return ui;
     if (path === "/health")
       return new Response(
         req.method === "HEAD"
@@ -35,7 +38,7 @@ export default {
       path === "/" || path === "/dashboard"
         ? { body: html, type: "text/html; charset=utf-8" }
         : path === "/app.css"
-          ? { body: css, type: "text/css" }
+          ? { body: uiCss, type: "text/css" }
           : path === "/app.js"
             ? { body: previewScript, type: "text/javascript" }
             : null;

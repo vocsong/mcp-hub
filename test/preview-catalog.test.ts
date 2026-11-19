@@ -114,7 +114,7 @@ describe("production preview native catalog", () => {
   });
   it("sends one-year HSTS from every production route, with or without the flag", async () => {
     for (const settings of [live, enabled])
-      for (const path of ["/", "/dashboard", "/app.js", "/health", "/login", "/login/session", "/api/connections"]) {
+      for (const path of ["/", "/dashboard", "/app.js", "/health", "/login", "/login/session", "/api/connections", "/ui/vocs-ui.css", "/ui/fonts/inter-latin-var.woff2", "/favicon.svg"]) {
         const response = await preview.fetch(get(origin + path), settings);
         expect(
           response.headers.get("Strict-Transport-Security"),

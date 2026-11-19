@@ -107,3 +107,11 @@ A separate deployable entry point, `src/preview.ts`, safely previews the neutral
 The public mock routes accept only GET/HEAD for static assets. Dedicated `/login/*` routes handle the separate product identity session. All demo requests, simulated budget, approvals and generated test tones exist only in the browser tab's memory. Reload resets everything. No API-key input is present; `/openrouter` reports unavailable; `/api/*` is not implemented. The restrictive CSP blocks browser network connections. The UI clearly labels the mock, its lack of billing/authentication, and Cloudflare hosting metadata caveat. `/health` identifies the mock version and separately reports the identity-only login/storage status.
 
 The server-side MVP remains separate and disabled by default. Publishing the design preview does not complete OAuth, real TTS, multi-user production security or MCP client compatibility.
+
+The public page is derived from the frozen template in `src/preview-template.ts` by guarded rewrites in `src/preview-assets.ts`: each edit must match exactly once, or the module throws while loading, so tests, `check:preview` and Worker start-up fail instead of publishing private template copy or the key form.
+
+## Vocs UI
+
+Every page uses the shared [Vocs UI](src/vocs-ui/README.md) design system with the amber MCP Hub hue (`data-product="mcp"`); the theme follows the system. `src/vocs-ui/` is a vendored copy of `vocsong/vocs.io` `design/system/` — never edit it here. Re-vendor from a vocs.io checkout with `node scripts/sync-design-system.mjs --vendor <this repo>/src/vocs-ui`.
+
+There is no static-assets binding, so each HTML entry (`src/index.ts`, `src/preview.ts`, `src/staging.ts`) serves the assets same-origin from `src/ui/assets.ts`: `/ui/vocs-ui.css` (fonts, tokens, components and the MCP layer in `src/ui/mcp-css.ts`, which uses only `--v-*` tokens), `/ui/vocs-ui.js` (closes the product switcher), `/ui/fonts/*.woff2` (immutable) and `/favicon.svg`. Shell partials live in `src/ui/shell.ts`. Pages need no inline styles or scripts; their CSPs only add `font-src 'self'`, `img-src 'self'` and, for OAuth and staging pages, `style-src 'self'`.

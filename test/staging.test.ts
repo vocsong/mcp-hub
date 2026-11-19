@@ -451,6 +451,36 @@ describe("models-only staging entry", () => {
       );
     }
   });
+  it("serves the styled landing and its same-origin assets only when enabled", async () => {
+    const landing = await call("/");
+    expect(landing.headers.get("Content-Security-Policy")).toBe(
+      "default-src 'none'; style-src 'self'; font-src 'self'; img-src 'self'; frame-ancestors 'none'; base-uri 'none'",
+    );
+    const page = await landing.text();
+    expect(page).toContain("<h1>Models-only staging</h1>");
+    expect(page).toContain(
+      '<a class="v-btn v-btn-primary v-btn-lg v-btn-block" href="/login">',
+    );
+    for (const path of [
+      "/ui/vocs-ui.css",
+      "/ui/fonts/inter-latin-var.woff2",
+      "/favicon.svg",
+    ]) {
+      expect(page).toContain(`"${path}"`);
+      const asset = await call(path);
+      expect(asset.status, path).toBe(200);
+      expect(asset.headers.get("Strict-Transport-Security")).toBe(
+        "max-age=86400",
+      );
+      expect(
+        (await call(path, {}, { ...cfg, STAGING_ENABLED: "false" })).status,
+      ).toBe(503);
+    }
+    // JSON responses keep the original policy.
+    expect((await call("/health")).headers.get("Content-Security-Policy")).toBe(
+      "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+    );
+  });
   it("fails closed when disabled, misbound or configured for paid/provider access", async () => {
     for (const patch of [
       { STAGING_ENABLED: "false" },

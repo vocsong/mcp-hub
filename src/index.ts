@@ -11,7 +11,8 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { z, ZodError } from "zod";
 import { identity, boundedBody } from "./security";
 import { Tenant, speechSchema } from "./tenant";
-import { dashboard, css, script } from "./dashboard";
+import { dashboard, script } from "./dashboard";
+import { serveUiAsset, uiCss } from "./ui/assets";
 import { Fault, MODEL, type Env, type Identity } from "./types";
 export { Tenant };
 const responseHeaders = {
@@ -19,7 +20,7 @@ const responseHeaders = {
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "no-referrer",
   "Content-Security-Policy":
-    "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+    "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
   "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
 };
 const knownErrors: Record<string, number> = {
@@ -182,7 +183,7 @@ async function handleAuthenticated(
     ["/", "/dashboard", "/app.css", "/app.js"].includes(path)
   )
     return new Response(
-      path === "/app.css" ? css : path === "/app.js" ? script : dashboard,
+      path === "/app.css" ? uiCss : path === "/app.js" ? script : dashboard,
       {
         headers: {
           ...responseHeaders,
@@ -261,6 +262,9 @@ export default {
       // Staging must use the separate entry with no tenant/provider execution paths.
       if (env.LOGIN_PROFILE === "staging")
         throw new Fault("staging_entry_required", 503);
+      // Shared Vocs UI stylesheet, fonts and favicon: static, public, GET/HEAD only.
+      const ui = serveUiAsset(req);
+      if (ui) return ui;
       const login = await handleLogin(req, env);
       if (login) return login;
       const catalog = await handleAccountCatalog(req, env);
