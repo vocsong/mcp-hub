@@ -13,6 +13,7 @@ import { boundedBody } from "./security";
 import { serveUiAsset } from "./ui/assets";
 import { focusPage, requester } from "./ui/shell";
 import { Fault, MODEL, type Identity } from "./types";
+import { withNoTransform } from "./no-transform";
 export interface StagingEnv extends OAuthEnv, NativeCatalogEnv {
   STAGING_ENABLED?: string;
   LIVE_PROVIDER?: string;
@@ -36,7 +37,7 @@ const landing = focusPage({
 const secureResponse = (response: Response) => {
   const result = new Response(response.body, response);
   result.headers.set("Strict-Transport-Security", "max-age=86400");
-  return result;
+  return withNoTransform(result);
 };
 const json = (value: unknown, status = 200) =>
   Response.json(value, { status, headers });
@@ -154,13 +155,15 @@ export default {
         if (login) return secureResponse(login);
       }
       if (path === "/" && request.method === "GET")
-        return new Response(landing, {
-          headers: {
-            ...headers,
-            "Content-Security-Policy": landingCsp,
-            "Content-Type": "text/html; charset=utf-8",
-          },
-        });
+        return withNoTransform(
+          new Response(landing, {
+            headers: {
+              ...headers,
+              "Content-Security-Policy": landingCsp,
+              "Content-Type": "text/html; charset=utf-8",
+            },
+          }),
+        );
       if (
         path === "/openrouter" ||
         path.startsWith("/.well-known/oauth-") ||

@@ -1,4 +1,5 @@
 import { handleOAuth, cleanupOAuth, oauthEnabled } from "./oauth";
+import { withNoTransform } from "./no-transform";
 import { handleLogin, cleanupLogin } from "./login/worker";
 import {
   handleClientManagement,
@@ -252,7 +253,7 @@ async function handleAuthenticated(
   return json({ error: "not_found" }, 404);
 }
 
-export default {
+const worker = {
   async fetch(
     req: Request,
     env: Env,
@@ -309,5 +310,16 @@ export default {
     await cleanupLogin(env);
     if (capabilityAuthEnabled(env)) await cleanupClients(env);
     if (oauthEnabled(env)) await cleanupOAuth(env);
+  },
+} satisfies ExportedHandler<Env>;
+// Every HTML response carries Cache-Control no-transform (see no-transform.ts).
+export default {
+  ...worker,
+  async fetch(
+    req: Request,
+    env: Env,
+    ctx?: ExecutionContext,
+  ): Promise<Response> {
+    return withNoTransform(await worker.fetch(req, env, ctx));
   },
 } satisfies ExportedHandler<Env>;
