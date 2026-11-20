@@ -269,9 +269,14 @@ describe("official-library OAuth with primary D1 guards", () => {
     let b = await begin(client);
     expect(b.html).toContain("&lt;script&gt;");
     // Vocs UI: the consent page may load only the same-origin stylesheet, fonts and favicon.
+    // form-action also allows the validated redirect origin: Chromium applies it to the
+    // redirect that follows the consent POST.
     expect(b.r.headers.get("Content-Security-Policy")).toBe(
-      "default-src 'none'; style-src 'self'; font-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+      "default-src 'none'; style-src 'self'; font-src 'self'; img-src 'self'; form-action 'self' http://localhost:3000; frame-ancestors 'none'; base-uri 'none'",
     );
+    // same-origin (not no-referrer): browsers then send a real Origin on the consent POST
+    // instead of `Origin: null`, which originCheck would reject.
+    expect(b.r.headers.get("Referrer-Policy")).toBe("same-origin");
     expect(b.html).not.toMatch(/<style|\sstyle=|<script/);
     expect(
       (await approve(b, ["models:read"], { Origin: "https://evil.test" }))
@@ -283,6 +288,10 @@ describe("official-library OAuth with primary D1 guards", () => {
     b = await begin(client);
     const responses = await Promise.all([approve(b), approve(b)]);
     expect(responses.map((r) => r.status).sort()).toEqual([302, 400]);
+    // The redirect back to the client never carries a Referer.
+    expect(
+      responses.find((r) => r.status === 302)!.headers.get("Referrer-Policy"),
+    ).toBe("no-referrer");
     b = await begin(client);
     await db
       .prepare("INSERT INTO hub_login_session VALUES (?,?,?,?,?,?)")
@@ -308,6 +317,7 @@ describe("official-library OAuth with primary D1 guards", () => {
       b = await begin(client);
     const r = await approve(b, [], {}, "deny");
     expect(r.status).toBe(302);
+    expect(r.headers.get("Referrer-Policy")).toBe("no-referrer");
     const u = new URL(r.headers.get("Location")!);
     expect(u.searchParams.get("error")).toBe("access_denied");
     expect(u.searchParams.get("state")).toBe("state-value");

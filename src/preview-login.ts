@@ -1,4 +1,5 @@
 import preview from "./preview";
+import { withNoTransform } from "./no-transform";
 import { handleLogin, cleanupLogin, type LoginEnv } from "./login/worker";
 import { handleAccountCatalog, type CapabilityEnv } from "./authorization";
 /** The production preview entry: identity-only login, the static mock, and — only
@@ -44,7 +45,7 @@ async function route(request: Request, env: PreviewEnv): Promise<Response> {
 }
 export default {
   async fetch(request: Request, env: PreviewEnv): Promise<Response> {
-    return secureResponse(await route(request, env));
+    return withNoTransform(secureResponse(await route(request, env)));
   },
   async scheduled(_event: ScheduledController, env: PreviewEnv): Promise<void> {
     await cleanupLogin(env);

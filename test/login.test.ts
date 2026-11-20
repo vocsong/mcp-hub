@@ -574,7 +574,8 @@ describe("shared Vocs Login", () => {
     };
     const from = (ip: string) =>
       run(req("/login/start", {}, { "CF-Connecting-IP": ip }), limited);
-    for (let i = 0; i < 10; i++) expect((await from("203.0.113.7")).status).toBe(200);
+    for (let i = 0; i < 10; i++)
+      expect((await from("203.0.113.7")).status).toBe(200);
     const blocked = await from("203.0.113.7");
     expect(blocked.status).toBe(429);
     expect(await blocked.json()).toEqual({ error: "try_later" });
@@ -609,7 +610,8 @@ describe("shared Vocs Login", () => {
     expect(html).toContain("Continue with Vocs Login");
     expect(html).not.toContain("<style");
     expect(html).toContain('aria-live="polite"');
-    expect(login.headers.get("Cache-Control")).toBe("no-store");
+    // HTML also forbids proxy rewriting (no injected analytics beacon under this CSP).
+    expect(login.headers.get("Cache-Control")).toBe("no-store, no-transform");
     expect(login.headers.get("Referrer-Policy")).toBe("no-referrer");
     expect(login.headers.get("Content-Security-Policy")).not.toContain(
       "unsafe-inline",
