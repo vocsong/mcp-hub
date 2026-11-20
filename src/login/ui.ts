@@ -21,7 +21,7 @@ export const loginHtml = (failed: boolean) =>
   shell(
     "Sign in to MCP Hub",
     "Signing in to",
-    '<p class="v-text">Continue through Vocs Login with GitHub. Google is not available yet.</p>',
+    '<p class="v-text">Continue through Vocs Login with Google, GitHub or a passkey.</p>',
     '<button id="start" class="v-btn v-btn-primary v-btn-lg v-btn-block">Continue with Vocs Login <span class="v-arrow" aria-hidden="true">→</span></button><button id="cancel" class="v-btn v-btn-secondary v-btn-block">Cancel pending sign-in</button>',
     failed
       ? `<div class="v-note v-note-danger">${icon.alert()}<span>The sign-in could not finish. Start again from here.</span></div>`
@@ -67,7 +67,7 @@ export function loginHtmlForProfile(
   return rewrite(html, [
     ["Sign in to MCP Hub", "Sign in to MCP Hub staging", "all"],
     [
-      "Continue through Vocs Login with GitHub. Google is not available yet.",
+      "Continue through Vocs Login with Google, GitHub or a passkey.",
       "Continue through the separate Vocs Login staging service using your existing staging account.",
     ],
     ["Back to the public mock preview", "Back to models-only staging"],
