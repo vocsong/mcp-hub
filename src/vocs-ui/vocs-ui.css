@@ -31,7 +31,7 @@
   --v-surface-3: #e8e8ec;
   --v-fg: #1d1d1f;
   --v-fg-2: #5f5f66;
-  --v-fg-3: #76767d;
+  --v-fg-3: #6b6b72; /* ≥4.5:1 on --v-bg and --v-surface (AA) */
   --v-line: rgba(0, 0, 0, 0.075);
   --v-line-2: rgba(0, 0, 0, 0.14);
   --v-card-line: transparent;
@@ -102,7 +102,7 @@
     --v-surface-3: #2c2c2f;
     --v-fg: #f5f5f7;
     --v-fg-2: #a1a1a8;
-    --v-fg-3: #85858c;
+    --v-fg-3: #8e8e95;
     --v-line: rgba(255, 255, 255, 0.085);
     --v-line-2: rgba(255, 255, 255, 0.16);
     --v-card-line: rgba(255, 255, 255, 0.06);
@@ -222,9 +222,9 @@
   background: color-mix(in oklab, var(--v-hue) 28%, transparent);
 }
 .v-root :focus-visible {
+  /* The outline follows each element's own radius; never reshape the element on focus. */
   outline: 2px solid var(--v-hue);
   outline-offset: 2px;
-  border-radius: var(--v-r-s);
 }
 .v-root [hidden] {
   display: none !important;
