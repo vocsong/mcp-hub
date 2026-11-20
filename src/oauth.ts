@@ -42,6 +42,14 @@ export function oauthEnabled(env: OAuthEnv) {
     env.PRODUCT_LOGIN_ENABLED === "true"
   );
 }
+/** CSP source for a validated redirect URI: its origin (http/https), else its scheme. */
+export function formActionSource(redirectUri: string): string {
+  const url = new URL(redirectUri);
+  if (url.protocol === "https:" || url.protocol === "http:") return url.origin;
+  if (!/^[a-z][a-z0-9+.-]*:$/.test(url.protocol))
+    throw new Fault("invalid_request");
+  return url.protocol;
+}
 function originCheck(req: Request, origin: string) {
   if (
     req.headers.get("Origin") !== origin ||
@@ -411,9 +419,15 @@ export async function handleOAuth(
         const h = new Headers(transaction.headers);
         Object.entries(safeHeaders).forEach(([k, v]) => h.set(k, v));
         h.set("Content-Type", "text/html; charset=utf-8");
+        // no-referrer makes Chromium send `Origin: null` on the consent POST, which
+        // originCheck rightly rejects. same-origin keeps the CSRF-verifiable Origin for the
+        // same-origin form submission without ever sending this URL to the client.
+        h.set("Referrer-Policy", "same-origin");
+        // Chromium also applies form-action to the redirect that follows the POST, so the
+        // library-validated redirect origin must be allowed alongside 'self'.
         h.set(
           "Content-Security-Policy",
-          "default-src 'none'; style-src 'self'; font-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+          `default-src 'none'; style-src 'self'; font-src 'self'; img-src 'self'; form-action 'self' ${formActionSource(description.redirectUri)}; frame-ancestors 'none'; base-uri 'none'`,
         );
         return new Response(
           consentHtml({
@@ -455,6 +469,7 @@ export async function handleOAuth(
       if (!binding) throw new Fault("invalid_request");
       if (form.get("decision") === "deny") {
         const denied = await api.denyConsent(req, handle);
+        denied.headers.set("Referrer-Policy", "no-referrer");
         return new Response(null, { status: 302, headers: denied.headers });
       }
       if (
@@ -508,6 +523,7 @@ export async function handleOAuth(
         revokeExistingGrants: false,
       });
       approved.headers.set("Location", result.redirectTo);
+      approved.headers.set("Referrer-Policy", "no-referrer");
       return new Response(null, { status: 302, headers: approved.headers });
     }
     // Bound library form/JSON parsers before dispatch, including requests lacking Content-Length.
