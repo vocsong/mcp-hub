@@ -608,6 +608,9 @@ describe("shared Vocs Login", () => {
     expect(login.status).toBe(200);
     const html = await login.text();
     expect(html).toContain("Continue with Vocs Login");
+    // The copy names exactly the sign-in methods production Vocs Login offers.
+    expect(html).toContain("with Google, GitHub or a passkey");
+    expect(html).not.toContain("not available yet");
     expect(html).not.toContain("<style");
     expect(html).toContain('aria-live="polite"');
     // HTML also forbids proxy rewriting (no injected analytics beacon under this CSP).
