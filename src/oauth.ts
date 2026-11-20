@@ -16,6 +16,7 @@ import {
   type LoginEnv,
 } from "./login/worker";
 import { boundedBody, digest } from "./security";
+import { consentHtml, signInRequiredHtml } from "./oauth-ui";
 import { Fault, type Identity } from "./types";
 export interface OAuthEnv extends LoginEnv {
   APP_MODE?: string;
@@ -33,14 +34,6 @@ const safeHeaders = {
 };
 const json = (value: unknown, status = 200) =>
   Response.json(value, { status, headers: safeHeaders });
-const esc = (s: string) =>
-  s.replace(
-    /[&<>"']/g,
-    (c) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
-        c
-      ]!,
-  );
 export function oauthEnabled(env: OAuthEnv) {
   return (
     env.CAPABILITY_AUTH_ENABLED === "true" &&
@@ -320,18 +313,15 @@ export async function handleOAuth(
       if (req.method !== "GET") originCheck(req, origin);
       const session = await readLoginSession(req, db, env);
       if (!session)
-        return new Response(
-          '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in</title><p><a href="/login">Sign in</a>, then restart authorization from your client.</p>',
-          {
-            status: 401,
-            headers: {
-              ...safeHeaders,
-              "Content-Type": "text/html; charset=utf-8",
-              "Content-Security-Policy":
-                "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
-            },
+        return new Response(signInRequiredHtml(), {
+          status: 401,
+          headers: {
+            ...safeHeaders,
+            "Content-Type": "text/html; charset=utf-8",
+            "Content-Security-Policy":
+              "default-src 'none'; style-src 'self'; font-src 'self'; img-src 'self'; frame-ancestors 'none'; base-uri 'none'",
           },
-        );
+        });
       if (path.startsWith("/api/oauth/grants")) {
         if (req.method === "GET" && path === "/api/oauth/grants") {
           const rows = await db
@@ -423,10 +413,20 @@ export async function handleOAuth(
         h.set("Content-Type", "text/html; charset=utf-8");
         h.set(
           "Content-Security-Policy",
-          "default-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+          "default-src 'none'; style-src 'self'; font-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
         );
         return new Response(
-          `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Authorize Vocs MCP</title><h1>Authorize ${esc(description.clientName)}</h1><p>${description.clientDomain ? "Verified client domain: " + esc(description.clientDomain) : "Client name is self-asserted and unverified."}</p><p>Redirect destination: ${esc(description.redirectHost)}</p><p>${esc(description.redirectUri)}</p>${description.redirectIsLoopback ? "<p>Any local process could be listening at this loopback address.</p>" : ""}<p>Resource: ${esc(resource)}</p><p>Access ends within five minutes of source sign-in. No dashboard access or refresh token. ${profile.name === "staging" ? "This staging service lists models only. It cannot execute speech, paid requests or audio operations." : "Speech still requires your separate exact-text approval; this consent does not execute a provider request."}</p><form method="post" action="/oauth/authorize"><input type="hidden" name="handle" value="${esc(transaction.handle)}">${auth.scope.map((s) => `<label><input type="checkbox" name="scope" value="${esc(s)}" checked>${esc(s)}</label><br>`).join("")}<button name="decision" value="approve">Approve selected scopes</button><button name="decision" value="deny">Deny</button></form>`,
+          consentHtml({
+            clientName: description.clientName,
+            clientDomain: description.clientDomain,
+            redirectHost: description.redirectHost,
+            redirectUri: description.redirectUri,
+            redirectIsLoopback: description.redirectIsLoopback,
+            resource,
+            handle: transaction.handle,
+            scopes: auth.scope,
+            staging: profile.name === "staging",
+          }),
           { headers: h },
         );
       }

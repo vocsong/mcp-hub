@@ -614,6 +614,22 @@ describe("shared Vocs Login", () => {
     expect(login.headers.get("Content-Security-Policy")).not.toContain(
       "unsafe-inline",
     );
+    // Vocs UI: same-origin stylesheet, fonts and favicon, all served by this entry.
+    expect(login.headers.get("Content-Security-Policy")).toContain(
+      "font-src 'self'; img-src 'self'",
+    );
+    for (const path of [
+      "/ui/vocs-ui.css",
+      "/ui/fonts/inter-latin-var.woff2",
+      "/favicon.svg",
+      "/login/ui.js",
+      "/login/ui.css",
+    ]) {
+      expect(html.includes(`"${path}"`) || path === "/login/ui.css", path).toBe(
+        true,
+      );
+      expect((await preview.fetch(req(path), cfg)).status, path).toBe(200);
+    }
     expect(
       await (await preview.fetch(req("/health"), cfg)).json(),
     ).toMatchObject({

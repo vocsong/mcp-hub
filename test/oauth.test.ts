@@ -268,6 +268,11 @@ describe("official-library OAuth with primary D1 guards", () => {
     const client = await register();
     let b = await begin(client);
     expect(b.html).toContain("&lt;script&gt;");
+    // Vocs UI: the consent page may load only the same-origin stylesheet, fonts and favicon.
+    expect(b.r.headers.get("Content-Security-Policy")).toBe(
+      "default-src 'none'; style-src 'self'; font-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+    );
+    expect(b.html).not.toMatch(/<style|\sstyle=|<script/);
     expect(
       (await approve(b, ["models:read"], { Origin: "https://evil.test" }))
         .status,
@@ -370,6 +375,17 @@ describe("official-library OAuth with primary D1 guards", () => {
       .bind(Date.now() - 250000)
       .run();
     expect((await begin(client)).r.status).toBe(401);
+  });
+  it("asks a signed-out browser to sign in on a styled, script-free page", async () => {
+    const r = await call("/oauth/authorize?client_id=x");
+    expect(r.status).toBe(401);
+    expect(r.headers.get("Content-Security-Policy")).toBe(
+      "default-src 'none'; style-src 'self'; font-src 'self'; img-src 'self'; frame-ancestors 'none'; base-uri 'none'",
+    );
+    const html = await r.text();
+    expect(html).toContain('href="/login"');
+    expect(html).toContain("restart authorization from your client");
+    expect(html).not.toMatch(/<style|\sstyle=|<script/);
   });
   it("rechecks source grants and freshness at token exchange", async () => {
     const client = await register();

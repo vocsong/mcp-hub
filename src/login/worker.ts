@@ -3,8 +3,8 @@ import {
   loginHtmlForProfile,
   accountHtmlForProfile,
   loginScriptForProfile,
-  loginCss,
 } from "./ui";
+import { uiCss } from "../ui/assets";
 import {
   PRODUCTION_LOGIN,
   selectLoginProfile,
@@ -32,7 +32,7 @@ const headers = {
   "X-Content-Type-Options": "nosniff",
   "X-Robots-Tag": "noindex, nofollow",
   "Content-Security-Policy":
-    "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'",
+    "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'self'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'",
   "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
 };
 const response = (
@@ -414,7 +414,7 @@ export async function handleLogin(
           "Content-Type": "text/javascript",
         });
       if (url.pathname === "/login/ui.css")
-        return response(loginCss, 200, { "Content-Type": "text/css" });
+        return response(uiCss, 200, { "Content-Type": "text/css" });
     }
     if (
       request.method === "POST" &&
